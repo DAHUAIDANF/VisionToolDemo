@@ -1,0 +1,79 @@
+{
+ "version": 5,
+ "nodes": [
+  {
+   "Id": 1,
+   "Kind": 0,
+   "X": 120,
+   "Y": 160,
+   "NextId": 2,
+   "AltNextId": -1,
+   "Params": [],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 2,
+   "Kind": 13,
+   "X": 120,
+   "Y": 220,
+   "NextId": 3,
+   "AltNextId": -1,
+   "Params": [
+    1,
+    10,
+    0,
+    2000
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 3,
+   "Kind": 16,
+   "X": 120,
+   "Y": 280,
+   "NextId": 4,
+   "AltNextId": -1,
+   "Params": [
+    2,
+    0
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 4,
+   "Kind": 6,
+   "X": 120,
+   "Y": 340,
+   "NextId": 5,
+   "AltNextId": -1,
+   "Params": [
+    200
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 5,
+   "Kind": 12,
+   "X": 120,
+   "Y": 400,
+   "NextId": -1,
+   "AltNextId": -1,
+   "Params": [],
+   "Enabled": true,
+   "OpName": ""
+  }
+ ],
+ "templates": {},
+ "texts": {},
+ "keys": {},
+ "ops": {},
+ "extra": {
+  "2:0": "echo",
+  "2:1": "wf6 ok",
+  "3:0": "VisionTool_不存在的窗口XYZ"
+ }
+}

@@ -1,0 +1,99 @@
+{
+ "version": 5,
+ "nodes": [
+  {
+   "Id": 1,
+   "Kind": 0,
+   "X": 120,
+   "Y": 160,
+   "NextId": 2,
+   "AltNextId": -1,
+   "Params": [],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 2,
+   "Kind": 9,
+   "X": 120,
+   "Y": 220,
+   "NextId": 3,
+   "AltNextId": -1,
+   "Params": [
+    9,
+    0,
+    0
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 3,
+   "Kind": 14,
+   "X": 120,
+   "Y": 280,
+   "NextId": 4,
+   "AltNextId": -1,
+   "Params": [
+    0
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 4,
+   "Kind": 9,
+   "X": 120,
+   "Y": 340,
+   "NextId": 5,
+   "AltNextId": -1,
+   "Params": [
+    6,
+    0,
+    0
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 5,
+   "Kind": 8,
+   "X": 120,
+   "Y": 400,
+   "NextId": 6,
+   "AltNextId": -1,
+   "Params": [
+    0,
+    3
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 6,
+   "Kind": 12,
+   "X": 120,
+   "Y": 460,
+   "NextId": -1,
+   "AltNextId": -1,
+   "Params": [],
+   "Enabled": true,
+   "OpName": ""
+  }
+ ],
+ "templates": {},
+ "texts": {
+  "2": "count",
+  "4": "结果",
+  "5": "示例1：count 从 1 自增为 {count}"
+ },
+ "keys": {
+  "2": "1",
+  "4": "{count}"
+ },
+ "ops": {},
+ "extra": {
+  "3:0": "{count}={count}+1",
+  "3:1": "count"
+ }
+}

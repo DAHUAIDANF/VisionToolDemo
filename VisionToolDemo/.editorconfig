@@ -1,0 +1,26 @@
+# 与 VS 默认代码风格对齐：错误列表里的风格项（简化 new / 模式匹配 / 条件访问 / 括号 / 大括号等）
+# 以此为准批量应用并保持不再出现
+root = true
+
+[*.cs]
+
+# —— 简化项 ——
+csharp_style_implicit_object_creation_when_type_is_apparent = true:suggestion
+csharp_style_prefer_index_expression = true:suggestion
+csharp_style_prefer_range_operator = true:suggestion
+csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
+csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
+csharp_style_prefer_pattern_matching = true:suggestion
+dotnet_style_null_propagation = true:suggestion
+dotnet_style_object_initializer = true:suggestion
+dotnet_style_collection_initializer = true:suggestion
+dotnet_style_coalesce_expression = true:suggestion
+
+# 括号：不同优先级运算混用一律加括号（VS 默认 always_for_clarity）
+dotnet_style_parentheses_in_arithmetic_binary_operators = always_for_clarity:suggestion
+dotnet_style_parentheses_in_relational_binary_operators = always_for_clarity:suggestion
+dotnet_style_parentheses_in_other_binary_operators = always_for_clarity:suggestion
+dotnet_style_parentheses_in_logical_operators = always_for_clarity:suggestion
+
+# 大括号：仅当语句跨多行时必须加（与 VS 默认一致）
+csharp_prefer_braces = true:when_multiline:suggestion

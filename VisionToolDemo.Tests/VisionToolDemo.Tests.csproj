@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- Windows 上默认无需此开关；放在这里是为了支持在 Linux/macOS 上做交叉编译验证（dotnet build/test） -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <IsPackable>false</IsPackable>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VisionToolDemo\VisionToolDemo.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 测试资源：人脸检测测试图 + Haar 级联模型（拷贝到测试输出，供 FaceDetector 测试使用） -->
+    <None Include="Resources\lena.jpg" Link="lena.jpg" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Resources\wider_few.jpg" Link="wider_few.jpg" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Resources\wider_many.jpg" Link="wider_many.jpg" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\VisionToolDemo\Vision\haarcascade_frontalface_default.xml"
+          Link="haarcascade_frontalface_default.xml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\VisionToolDemo\Vision\face_detection_yunet_2023mar.onnx"
+          Link="face_detection_yunet_2023mar.onnx" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,87 @@
+{
+ "version": 5,
+ "nodes": [
+  {
+   "Id": 1,
+   "Kind": 0,
+   "X": 120,
+   "Y": 160,
+   "NextId": 2,
+   "AltNextId": -1,
+   "Params": [],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 2,
+   "Kind": 9,
+   "X": 120,
+   "Y": 220,
+   "NextId": 3,
+   "AltNextId": -1,
+   "Params": [
+    9,
+    0,
+    0
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 3,
+   "Kind": 15,
+   "X": 120,
+   "Y": 280,
+   "NextId": 4,
+   "AltNextId": 4,
+   "Params": [
+    0,
+    1,
+    5,
+    500,
+    1,
+    80
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 4,
+   "Kind": 8,
+   "X": 120,
+   "Y": 340,
+   "NextId": 5,
+   "AltNextId": -1,
+   "Params": [
+    0,
+    2
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 5,
+   "Kind": 12,
+   "X": 120,
+   "Y": 400,
+   "NextId": -1,
+   "AltNextId": -1,
+   "Params": [],
+   "Enabled": true,
+   "OpName": ""
+  }
+ ],
+ "templates": {},
+ "texts": {
+  "2": "status",
+  "4": "wf8 完成"
+ },
+ "keys": {
+  "2": "进行中"
+ },
+ "ops": {},
+ "extra": {
+  "3:0": "status",
+  "3:1": "完成"
+ }
+}

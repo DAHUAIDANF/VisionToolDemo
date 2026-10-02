@@ -1,0 +1,82 @@
+{
+ "version": 5,
+ "nodes": [
+  {
+   "Id": 1,
+   "Kind": 0,
+   "X": 120,
+   "Y": 160,
+   "NextId": 2,
+   "AltNextId": -1,
+   "Params": [],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 2,
+   "Kind": 23,
+   "X": 120,
+   "Y": 220,
+   "NextId": 3,
+   "AltNextId": -1,
+   "Params": [
+    0,
+    0,
+    0
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 3,
+   "Kind": 24,
+   "X": 120,
+   "Y": 280,
+   "NextId": 4,
+   "AltNextId": -1,
+   "Params": [
+    0,
+    0,
+    0
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 4,
+   "Kind": 24,
+   "X": 120,
+   "Y": 340,
+   "NextId": 5,
+   "AltNextId": -1,
+   "Params": [
+    1,
+    1,
+    0
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 5,
+   "Kind": 12,
+   "X": 120,
+   "Y": 400,
+   "NextId": -1,
+   "AltNextId": -1,
+   "Params": [],
+   "Enabled": true,
+   "OpName": ""
+  }
+ ],
+ "templates": {},
+ "texts": {},
+ "keys": {},
+ "ops": {},
+ "extra": {
+  "2:0": "chrome",
+  "3:0": "登录",
+  "4:0": "用户名",
+  "4:1": "admin"
+ }
+}

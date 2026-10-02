@@ -1,0 +1,123 @@
+{
+ "version": 5,
+ "nodes": [
+  {
+   "Id": 1,
+   "Kind": 0,
+   "X": 120,
+   "Y": 160,
+   "NextId": 2,
+   "AltNextId": -1,
+   "Params": [],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 2,
+   "Kind": 9,
+   "X": 120,
+   "Y": 220,
+   "NextId": 3,
+   "AltNextId": -1,
+   "Params": [
+    9,
+    0,
+    0
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 3,
+   "Kind": 7,
+   "X": 120,
+   "Y": 280,
+   "NextId": 7,
+   "AltNextId": 4,
+   "Params": [
+    100,
+    0
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 4,
+   "Kind": 14,
+   "X": 120,
+   "Y": 340,
+   "NextId": 5,
+   "AltNextId": -1,
+   "Params": [
+    0
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 5,
+   "Kind": 3,
+   "X": 120,
+   "Y": 400,
+   "NextId": 6,
+   "AltNextId": 3,
+   "Params": [
+    1,
+    0
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 6,
+   "Kind": 22,
+   "X": 120,
+   "Y": 460,
+   "NextId": 7,
+   "AltNextId": -1,
+   "Params": [],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 7,
+   "Kind": 8,
+   "X": 120,
+   "Y": 520,
+   "NextId": 8,
+   "AltNextId": -1,
+   "Params": [
+    0,
+    3
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 8,
+   "Kind": 12,
+   "X": 120,
+   "Y": 580,
+   "NextId": -1,
+   "AltNextId": -1,
+   "Params": [],
+   "Enabled": true,
+   "OpName": ""
+  }
+ ],
+ "templates": {},
+ "texts": {
+  "2": "n",
+  "5": "n",
+  "7": "示例3：循环递减到 n=0 提前跳出"
+ },
+ "keys": {
+  "2": "5",
+  "5": "0"
+ },
+ "ops": {},
+ "extra": {
+  "4:0": "{n}={n}-1",
+  "4:1": "n"
+ }
+}

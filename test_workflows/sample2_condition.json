@@ -1,0 +1,116 @@
+{
+ "version": 5,
+ "nodes": [
+  {
+   "Id": 1,
+   "Kind": 0,
+   "X": 120,
+   "Y": 160,
+   "NextId": 2,
+   "AltNextId": -1,
+   "Params": [],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 2,
+   "Kind": 9,
+   "X": 120,
+   "Y": 220,
+   "NextId": 3,
+   "AltNextId": -1,
+   "Params": [
+    9,
+    0,
+    0
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 3,
+   "Kind": 3,
+   "X": 120,
+   "Y": 280,
+   "NextId": 4,
+   "AltNextId": 5,
+   "Params": [
+    1,
+    4
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 4,
+   "Kind": 9,
+   "X": 120,
+   "Y": 340,
+   "NextId": 6,
+   "AltNextId": -1,
+   "Params": [
+    6,
+    0,
+    0
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 5,
+   "Kind": 9,
+   "X": 120,
+   "Y": 400,
+   "NextId": 6,
+   "AltNextId": -1,
+   "Params": [
+    6,
+    0,
+    0
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 6,
+   "Kind": 8,
+   "X": 120,
+   "Y": 460,
+   "NextId": 7,
+   "AltNextId": -1,
+   "Params": [
+    0,
+    3
+   ],
+   "Enabled": true,
+   "OpName": ""
+  },
+  {
+   "Id": 7,
+   "Kind": 12,
+   "X": 120,
+   "Y": 520,
+   "NextId": -1,
+   "AltNextId": -1,
+   "Params": [],
+   "Enabled": true,
+   "OpName": ""
+  }
+ ],
+ "templates": {},
+ "texts": {
+  "2": "count",
+  "3": "count",
+  "4": "分支",
+  "5": "分支",
+  "6": "示例2：count=10>5 → 走「是」分支"
+ },
+ "keys": {
+  "2": "10",
+  "3": "5",
+  "4": "是（count>5）",
+  "5": "否"
+ },
+ "ops": {},
+ "extra": {}
+}

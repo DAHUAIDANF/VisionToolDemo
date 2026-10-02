@@ -1,0 +1,231 @@
+﻿<UserControl x:Class="VisionToolDemo.Wpf.Views.AutomationPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource Bg}" Focusable="True">
+
+        <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/VisionToolDemo;component/Wpf/Styles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <DockPanel>
+        <Border Style="{StaticResource Card}" DockPanel.Dock="Top" Padding="12" Margin="0,0,0,8">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Left" Text="自动化工作流" Style="{StaticResource PageHeader}" VerticalAlignment="Center" />
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="主题" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="20,0,10,0" />
+                    <Border x:Name="ThemeDot0" Width="24" Height="24" Margin="7,0,0,0" CornerRadius="12" BorderThickness="2"
+                            ToolTip="深蓝灰（默认）" MouseLeftButtonDown="ThemeDot_Click" Tag="0" />
+                    <Border x:Name="ThemeDot1" Width="24" Height="24" Margin="7,0,0,0" CornerRadius="12" BorderThickness="2"
+                            ToolTip="深墨绿" MouseLeftButtonDown="ThemeDot_Click" Tag="1" />
+                    <Border x:Name="ThemeDot2" Width="24" Height="24" Margin="7,0,0,0" CornerRadius="12" BorderThickness="2"
+                            ToolTip="深紫罗兰" MouseLeftButtonDown="ThemeDot_Click" Tag="2" />
+                    <Border x:Name="ThemeDot3" Width="24" Height="24" Margin="7,0,0,0" CornerRadius="12" BorderThickness="2"
+                            ToolTip="暖橙红" MouseLeftButtonDown="ThemeDot_Click" Tag="3" />
+                    <Border x:Name="ThemeDot4" Width="24" Height="24" Margin="7,0,0,0" CornerRadius="12" BorderThickness="2"
+                            ToolTip="亮色浅色" MouseLeftButtonDown="ThemeDot_Click" Tag="4" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+        <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" MinHeight="240" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="240" MinHeight="140" />
+        </Grid.RowDefinitions>
+
+        <!-- ==================== 上半：节点库 | 画布 | 实例属性 ==================== -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="LibColumn" Width="266" MinWidth="180" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" MinWidth="260" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition x:Name="InspColumn" Width="352" MinWidth="280" />
+            </Grid.ColumnDefinitions>
+
+            <!-- ===== 节点库：搜索 + 分类 chips + 卡片列表 ===== -->
+            <Border Grid.Column="0" Style="{StaticResource Panel}" BorderThickness="0,0,1,0">
+                <DockPanel Margin="10,10,8,10">
+                    <TextBlock DockPanel.Dock="Top" Text="节点库" Style="{StaticResource SectionHeader}" />
+                    <TextBlock DockPanel.Dock="Top" Style="{StaticResource FaintText}" Margin="0,0,0,8"
+                               Text="搜索名称/分类；双击或拖到画布上添加。" TextWrapping="Wrap" />
+                    <TextBox x:Name="LibSearch" DockPanel.Dock="Top" Margin="0,0,0,8" />
+                    <!-- 分类 chips：用 Grid 而不是 ItemsControl——
+                         ItemsControl 会把 chip 包进 ContentPresenter，Grid.SetRow/SetColumn 打在
+                         chip 上无效，胶囊会全叠在第一行（用户反馈"下面的标签看不到"） -->
+                    <!-- 分类 + 节点列表放进同一个 ScrollViewer：共用一个滚动条一起滚 -->
+                    <ScrollViewer DockPanel.Dock="Top" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                        <StackPanel>
+                            <Grid x:Name="LibChips" Margin="0,0,0,8" HorizontalAlignment="Left">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                            </Grid>
+                            <ListBox x:Name="LibList" ItemContainerStyle="{StaticResource CardItem}"
+                                     MouseDoubleClick="LibList_MouseDoubleClick"
+                                     PreviewMouseMove="LibList_PreviewMouseMove"
+                                     ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                     VirtualizingPanel.IsVirtualizing="False" ScrollViewer.CanContentScroll="False">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" Style="{StaticResource CardTitle}" />
+                                            <TextBlock Text="{Binding Sub}" Style="{StaticResource CardSub}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"
+                          Background="#2AFFFFFF" ToolTip="拖动调整栏宽" />
+
+            <!-- ===== 画布 ===== -->
+            <Grid Grid.Column="2" Background="{DynamicResource Bg}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Border Grid.Row="0" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource Line}"
+                        BorderThickness="0,0,0,1" Padding="8,6">
+                    <DockPanel>
+                        <TextBlock x:Name="CanvasHint" DockPanel.Dock="Left" Style="{StaticResource FaintText}"
+                                   VerticalAlignment="Center" TextWrapping="Wrap"
+                                   Text="中键拖动平移 · 滚轮缩放 · 点节点选中 · 拖节点移动 · 点右侧圆点再点目标节点连线 · Esc 取消" />
+                        <TextBlock x:Name="ZoomText" DockPanel.Dock="Right" Style="{StaticResource FaintText}"
+                                   VerticalAlignment="Center" Text="100%" Margin="8,0,0,0" />
+                    </DockPanel>
+                </Border>
+                <Border x:Name="CanvasHost" Grid.Row="1" ClipToBounds="True" Background="{DynamicResource PanelBg}"
+                        AllowDrop="True" Drop="CanvasHost_Drop" DragOver="CanvasHost_DragOver"
+                        MouseWheel="CanvasHost_MouseWheel" MouseDown="CanvasHost_MouseDown"
+                        MouseMove="CanvasHost_MouseMove" MouseUp="CanvasHost_MouseUp">
+                    <Canvas x:Name="Surface" Background="Transparent">
+                        <Canvas.RenderTransform>
+                            <TransformGroup>
+                                <ScaleTransform x:Name="ZoomT" ScaleX="1" ScaleY="1" />
+                                <TranslateTransform x:Name="PanT" X="40" Y="40" />
+                            </TransformGroup>
+                        </Canvas.RenderTransform>
+                    </Canvas>
+                </Border>
+            </Grid>
+
+            <GridSplitter Grid.Column="3" Width="4" HorizontalAlignment="Stretch"
+                          Background="#2AFFFFFF" ToolTip="拖动调整栏宽" />
+
+            <!-- ===== 实例属性 ===== -->
+            <Border Grid.Column="4" Style="{StaticResource Panel}" BorderThickness="1,0,0,0">
+                <DockPanel Margin="10">
+                    <TextBlock DockPanel.Dock="Top" Text="实例属性" Style="{StaticResource SectionHeader}" />
+                    <TextBlock x:Name="InspTitle" DockPanel.Dock="Top" Style="{StaticResource DimText}" Margin="0,0,0,8" TextWrapping="Wrap" />
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel x:Name="InspHost" />
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <GridSplitter Grid.Row="1" Height="4" HorizontalAlignment="Stretch"
+                      Background="#2AFFFFFF" ToolTip="拖动调整上下区域" />
+
+        <!-- ==================== 下半：结果抽屉 ==================== -->
+        <Border Grid.Row="2" Style="{StaticResource Panel}" BorderThickness="0,1,0,0">
+            <TabControl x:Name="Drawer">
+                <TabItem Header="图像与结果">
+                    <Grid Margin="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MinWidth="240" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="300" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Background="{DynamicResource InputBg}" CornerRadius="6" ClipToBounds="True">
+                            <Image x:Name="PreviewImage" Stretch="Uniform" Margin="6" />
+                        </Border>
+                        <!-- 右侧统计面板：包进滚动条，窗口矮/卡片多时「规则 N 条」等底部行不会被裁掉 -->
+                        <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="12,4,4,4">
+                            <TextBlock x:Name="PreviewCaption" Style="{StaticResource DimText}" Text="{Binding PreviewCaption}" TextWrapping="Wrap" />
+                            <UniformGrid Columns="2" Margin="0,10,0,0">
+                                <Border Style="{StaticResource Card}" Margin="0,0,5,5">
+                                    <StackPanel>
+                                        <TextBlock Text="总判定" Style="{StaticResource FaintText}" />
+                                        <TextBlock x:Name="StatVerdict" FontSize="20" FontWeight="Bold" Text="{Binding StatVerdict}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource Card}" Margin="5,0,0,5">
+                                    <StackPanel>
+                                        <TextBlock Text="总耗时" Style="{StaticResource FaintText}" />
+                                        <TextBlock x:Name="StatMs" FontSize="20" FontWeight="Bold" Text="{Binding StatMs}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource Card}" Margin="0,5,5,0">
+                                    <StackPanel>
+                                        <TextBlock Text="步数 / 动作" Style="{StaticResource FaintText}" />
+                                        <TextBlock x:Name="StatSteps" FontSize="20" FontWeight="Bold" Text="{Binding StatSteps}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource Card}" Margin="5,5,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="跳过 / 失败" Style="{StaticResource FaintText}" />
+                                        <TextBlock x:Name="StatSkip" FontSize="20" FontWeight="Bold" Text="{Binding StatSkip}" />
+                                    </StackPanel>
+                                </Border>
+                            </UniformGrid>
+                            <TextBlock x:Name="StatNote" Style="{StaticResource FaintText}" Margin="0,10,0,0" Text="{Binding StatNote}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+                </TabItem>
+                <TabItem Header="运行日志">
+                    <TextBox x:Name="LogBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                             FontFamily="{StaticResource MonoFont}" FontSize="12"
+                             VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                             Background="{DynamicResource InputBg}" BorderThickness="0" Margin="8"
+                             Text="{Binding LogText}" />
+                </TabItem>
+                <TabItem Header="校验结果">
+                    <ListBox x:Name="IssueList" Margin="8" MouseDoubleClick="IssueList_MouseDoubleClick"
+                             VirtualizingPanel.IsVirtualizing="False" ScrollViewer.CanContentScroll="False">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding TagText}" FontWeight="Bold" Margin="0,0,8,0" />
+                                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </TabItem>
+                <TabItem Header="运行记录">
+                    <DockPanel Margin="8">
+                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+                            <Button x:Name="BtnOpenRecDir" Content="打开记录目录" Style="{StaticResource FlatButton}" Command="{Binding OpenRecDirCommand}" />
+                            <Button x:Name="BtnRefreshRec" Content="刷新" Style="{StaticResource FlatButton}" Margin="8,0,0,0" Command="{Binding RefreshRecCommand}" />
+                        </StackPanel>
+                        <ListBox x:Name="RecordList" MouseDoubleClick="RecordList_MouseDoubleClick"
+                                 VirtualizingPanel.IsVirtualizing="False" ScrollViewer.CanContentScroll="False">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Sub}" Style="{StaticResource FaintText}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+                </TabItem>
+            </TabControl>
+        </Border>
+    </Grid>
+    </DockPanel>
+</UserControl>

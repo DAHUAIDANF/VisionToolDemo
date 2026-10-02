@@ -1,0 +1,2 @@
+red_class
+blue_class

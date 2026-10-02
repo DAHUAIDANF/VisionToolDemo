@@ -1,0 +1,88 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- 仅保留 WPF 界面（矢量渲染 + Grid 自动布局，按分辨率与 DPI 自适应）；
+         经典 WinForms 界面已随项目清理移除 -->
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PlatformTarget>x64</PlatformTarget>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RootNamespace>VisionToolDemo</RootNamespace>
+    <AssemblyName>VisionToolDemo</AssemblyName>
+    <ApplicationIcon>APP.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260427" />
+    <!-- OpenCvSharp 原生库与托管库统一走 NuGet（nuget.org 的 runtime.win 4.13.0.20260627
+         含 features2d_Ptr_Feature2D_get 导出，SimpleBlobDetector 可用）；
+         已不再使用内网源旧包与 packages\ 手工拷贝目录 -->
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260627" />
+    <!-- 截屏路径使用 System.Drawing.Bitmap（GDI+ CopyFromScreen → ToMat）；
+         Windows 上由 WPF 框架隐含提供，此处显式引用以支持 Linux 交叉编译（EnableWindowsTargeting） -->
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+    <!-- Ecc200Decoder 复用 ZXing 的公开 API（DefaultPlacement 位排布 + RS 纠错），其 DM 检测器不用于点阵码 -->
+    <PackageReference Include="ZXing.Net" Version="0.16.10" />
+    <!-- 相机 RAW 照片（CR2/CR3/NEF/ARW/DNG/RAF/ORF/RW2 等）解码：ImageMagick 内置 libraw 支持 -->
+    <PackageReference Include="Magick.NET-Q8-x64" Version="14.17.1" />
+    <!-- Tesseract 5.2.0 托管封装 + x64 原生 tesseract50.dll/leptonica。
+         仅用于"字符识别OCR"算子的可选增强引擎（chinese/english 训练数据需另放 tessdata 目录） -->
+    <PackageReference Include="Tesseract" Version="5.2.0" />
+    <!-- ONNX Runtime（MIT 许可，开源免费可商用）：深度学习推理算子的推理引擎。
+         CPU 版内置 win-x64 与 linux-x64 原生库，跨平台；不绑定模型家族，
+         模型文件由用户自备（请选用 Apache-2.0 等可商用许可的开源模型） -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.22.1" />
+  </ItemGroup>
+
+  <!-- net48 时代的 ClickOnce/Settings/Resources 已不再使用（Settings.Designer.cs 依赖 System.Configuration），
+       相关文件已随经典界面一起删除，无需再排除 -->
+
+  <!-- OpenCvSharp 原生库来自 NuGet 包 runtime.win 4.13.0.20260627（版本与托管库统一）。
+       普通构建（不带 RuntimeIdentifier）不会自动复制 runtimes/ 下的 native，
+       这里显式拷贝到输出根，行为与旧 packages\ 手工目录一致 -->
+  <ItemGroup>
+    <None Include="$(NuGetPackageRoot)opencvsharp4.runtime.win\4.13.0.20260627\runtimes\win-x64\native\OpenCvSharpExtern.dll" Link="OpenCvSharpExtern.dll" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(NuGetPackageRoot)opencvsharp4.runtime.win\4.13.0.20260627\runtimes\win-x64\native\opencv_videoio_ffmpeg4130_64.dll" Link="opencv_videoio_ffmpeg4130_64.dll" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="APP.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- 人脸检测 Haar 级联模型（OpenCV 开源，BSD 可商用）：随程序输出，FaceDetector 自动查找。
+         供深度学习推理人脸增强 / 目标跟踪人脸追踪 / 训练页标注自动检测人脸共用。
+         Link 展平到输出根（此前未展平被复制到 Vision\ 子目录，FaceDetector 按根目录查找导致模型不可用）。 -->
+    <Content Include="Vision\haarcascade_frontalface_default.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>haarcascade_frontalface_default.xml</Link>
+    </Content>
+    <!-- YuNet 人脸检测 ONNX 模型（OpenCV Zoo 官方，Apache-2.0 可商用，约 232KB）：
+         人脸检测首选引擎，自然场景/多人/侧脸/低光检出率远高于 Haar（WIDER FACE 基准）。
+         FaceDetector 双引擎：YuNet 优先，Haar 回退。 -->
+    <Content Include="Vision\face_detection_yunet_2023mar.onnx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>face_detection_yunet_2023mar.onnx</Link>
+    </Content>
+    <!-- Tesseract 语言包：放在程序目录 tessdata 下，运行时由 TesseractEngine.ResolveDataPath 自动找到。
+         语言包约 16MB，首次拷贝后 PreserveNewest 不会重复复制。
+         保留通配符而非逐文件列举：以后补装其他语言（如 jpn、deu）不需要改工程文件。 -->
+    <Content Include="tessdata\*.traineddata">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>tessdata\%(Filename)%(Extension)</Link>
+    </Content>
+    <!-- 软件使用图文手册的界面截图（16 张）：随程序输出到 docs\img\，
+         说明页「⑪ 软件使用图文手册」按相对路径 docs/img/xx.png 读取。
+         Link 展平到输出目录 docs\img\，仓库源位于项目根 docs\img\。 -->
+    <Content Include="..\docs\img\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>docs\img\%(Filename)%(Extension)</Link>
+    </Content>
+  </ItemGroup>
+
+</Project>
