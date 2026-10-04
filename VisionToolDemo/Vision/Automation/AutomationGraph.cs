@@ -39,6 +39,7 @@ namespace VisionToolDemo.Vision.Automation
         CameraGrab,     // 相机取图（从采集页已连接的相机抓一帧作为当前图）
         PlcRead,        // PLC 读取（读寄存器/线圈 → 全局变量）
         PlcWrite,       // PLC 写入（寄存器/线圈 ← 常量或变量）
+        TimerTrigger,   // 定时触发：按间隔节流（配合循环做周期采集/检测）
     }
 
     /// <summary>一个自动化节点</summary>
@@ -102,6 +103,7 @@ namespace VisionToolDemo.Vision.Automation
             AutoNodeKind.CameraGrab => "相机取图",
             AutoNodeKind.PlcRead => "PLC读取",
             AutoNodeKind.PlcWrite => "PLC写入",
+            AutoNodeKind.TimerTrigger => "定时触发",
             _ => "结束",
         };
 
@@ -130,6 +132,7 @@ namespace VisionToolDemo.Vision.Automation
             AutoNodeKind.CameraGrab => "相机取图",
             AutoNodeKind.PlcRead => "PLC读取",
             AutoNodeKind.PlcWrite => "PLC写入",
+            AutoNodeKind.TimerTrigger => "定时触发",
             _ => null,      // VisionOp 的算子由节点自带的 OpName 决定
         };
 
@@ -982,6 +985,8 @@ namespace VisionToolDemo.Vision.Automation
                                 int nodeId = node.Id;
                                 nss.NodeStringProvider = slot => graph.GetNodeString(nodeId, slot);
                             }
+                            // 定时触发节点需要知道自己的节点 Id（跨次执行的节拍状态按节点保存）
+                            if (taskObj is Vision.Tasks.TimerTriggerTask t3) t3.NodeId = node.Id;
 
                             if (node.Kind == AutoNodeKind.Match)
                             {

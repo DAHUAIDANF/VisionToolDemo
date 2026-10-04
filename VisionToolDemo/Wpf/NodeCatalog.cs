@@ -87,6 +87,7 @@ namespace VisionToolDemo.Wpf
             AddKind(AutoNodeKind.Expression, "变量与脚本", "表达式计算（零依赖小语言）写进变量");
             AddKind(AutoNodeKind.Command, "变量与脚本", "命令行：跑外部程序，拿退出码与输出");
             AddKind(AutoNodeKind.Http, "变量与脚本", "HTTP 请求：上报结果或取参数");
+            AddKind(AutoNodeKind.TimerTrigger, "流程", "定时触发：按间隔节流，配合循环做周期采集/检测");
 
             // 全部视觉算子（自动化专用的不列）
             foreach (string name in VisionTaskRegistry.GetVisionToolNames())

@@ -91,14 +91,15 @@ namespace VisionToolDemo.Vision.Tasks
                 // 任务类型：0=图像分类（输出前 5 类），1=目标检测（YOLO 系导出格式）
                 ParamName = "任务类型",
                 Min = 0,
-                Max = 2,
+                Max = 3,
                 DefaultValue = 0,
                 DisplayFormat = "类型:{0}",
                 ForceOdd = false,
                 Tip = "0 图像分类：softmax 取前 5 类标注在图上。\n" +
                       "1 目标检测：YOLOv5/YOLOv8 导出格式，画框+类别+置信度。\n" +
                       "2 滑窗多人/多目标识别：训练页自研模型（框选标注+标签），一张图识别出多个目标" +
-                      "（人像姓名 / 产品NG类型）并各自画框+标签；建议训练时标注含「背景」类抑制误检。"
+                      "（人像姓名 / 产品NG类型）并各自画框+标签；建议训练时标注含「背景」类抑制误检。\n" +
+                      "3 实例分割：YOLOv8-seg 导出（检测+每个目标的像素级掩膜），掩膜半透明着色叠加 + 框 + 标签。"
             },
             new TaskParamDesc
             {
@@ -191,6 +192,19 @@ namespace VisionToolDemo.Vision.Tasks
                       "模型文件 face_detection_yunet_2023mar.onnx / haarcascade_frontalface_default.xml 随程序输出（程序目录自动查找）；" +
                       "缺失/图中无人脸时自动降级为普通滑窗并在摘要说明。"
             },
+            new TaskParamDesc
+            {
+                // 任务类型=3 实例分割的掩膜不透明度（%）：
+                // 掩膜以半透明色块叠加在原图上，越高越不透明（越能遮住原图纹理）
+                ParamName = "掩膜不透明度",
+                Min = 20,
+                Max = 90,
+                DefaultValue = 60,
+                DisplayFormat = "掩膜:{0}%",
+                ForceOdd = false,
+                Group = "实例分割",
+                Tip = "任务类型=3 实例分割专用：掩膜叠加在原图上的不透明度（越高越不透明）。"
+            },
         ];
 
         // ============================== 执行 ==============================
@@ -208,8 +222,8 @@ namespace VisionToolDemo.Vision.Tasks
             // 参数（越界/空数组回退默认，兼容旧调用）
             // 注意：索引必须与 ParamDescriptions 的声明顺序一致：
             //   [0]任务类型 [1]输入边长 [2]窗口边长 [3]窗口步长
-            //   [4..8]ROI(启用/X/Y/宽/高) [9]置信度阈值 [10]NMS IoU [11]显示前N类 [12]人脸增强
-            int taskType = paramValues?.Length > 0 ? Math.Clamp(paramValues[0], 0, 2) : 0;
+            //   [4..8]ROI(启用/X/Y/宽/高) [9]置信度阈值 [10]NMS IoU [11]显示前N类 [12]人脸增强 [13]掩膜不透明度
+            int taskType = paramValues?.Length > 0 ? Math.Clamp(paramValues[0], 0, 3) : 0;
             int inputSide = paramValues?.Length > 1 ? Math.Clamp(paramValues[1], 0, 1280) : 0;
             int winSide = paramValues?.Length > 2 ? Math.Max(0, paramValues[2]) : 0;   // 任务类型2 窗口边长
             int winStep = paramValues?.Length > 3 ? Math.Max(0, paramValues[3]) : 0;   // 任务类型2 窗口步长
@@ -228,6 +242,7 @@ namespace VisionToolDemo.Vision.Tasks
             float iou = (paramValues?.Length > 10 ? Math.Clamp(paramValues[10], 10, 95) : 45) / 100f;
             int topN = paramValues?.Length > 11 ? Math.Clamp(paramValues[11], 1, 10) : 5;
             int faceOn = paramValues?.Length > 12 ? Math.Clamp(paramValues[12], 0, 1) : 0;   // 人脸增强（滑窗前置）
+            int maskAlpha = paramValues?.Length > 13 ? Math.Clamp(paramValues[13], 20, 90) : 60; // 实例分割掩膜不透明度
 
             // 输出图：默认原图 BGR 拷贝；任何失败路径都返回它（防御）
             Mat dst = VisionHelper.ToBgrCopy(srcMat);
@@ -309,6 +324,39 @@ namespace VisionToolDemo.Vision.Tasks
                         else
                             RunSlidingDetection(dst, srcMat, inputSide, conf, iou, winSide, winStep,
                                                 topN, roiEnabled, roiRect);
+                    }
+                    else if (taskType == 3)
+                    {
+                        // 实例分割（YOLOv8-seg）：检测头 [1,4+nc,N] + 原型掩膜 [1,32,Hm,Wm]。
+                        // 与检测同样 letterbox 预处理；NMS 后逐框用 32 维原型系数解码像素级掩膜，
+                        // 缩回原图尺寸后半透明着色叠加 + 框 + 标签。
+                        float padRatio = 1f;
+                        float[] input = BuildInput(inferSrc, inputSide, out padRatio);
+                        if (input == null)
+                        {
+                            LastSummary = "深度学习推理: 输入预处理失败";
+                            return dst;
+                        }
+                        dynamic inputTensor = BuildInputTensor(input, inType, new[] { 1, 3, inputSide, inputSide });
+                        var inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(inName, inputTensor) };
+                        using var results = _session.Run(inputs);
+                        if (results.Count < 2)
+                        {
+                            LastSummary = "深度学习推理: 实例分割模型缺少原型掩膜输出（期望 2 个输出：检测+原型），" +
+                                          "请确认导出的是 YOLOv8-seg 模型（如 yolov8n-seg.onnx）";
+                            return dst;
+                        }
+                        var detMeta = _session.OutputMetadata.ElementAtOrDefault(0);
+                        var protoMeta = _session.OutputMetadata.ElementAtOrDefault(1);
+                        if (detMeta.Key == null || protoMeta.Key == null)
+                        {
+                            LastSummary = "深度学习推理: 模型输出元数据为空";
+                            return dst;
+                        }
+                        var (detData, detDims) = ReadOutput(results[0], detMeta.Value.ElementDataType);
+                        var (protoData, protoDims) = ReadOutput(results[1], protoMeta.Value.ElementDataType);
+                        RunSegmentation(dst, detData, detDims, protoData, conf, iou, inputSide, padRatio,
+                                        roiEnabled ? roiRect.X : 0, roiEnabled ? roiRect.Y : 0, maskAlpha);
                     }
                     else
                     {
@@ -690,6 +738,183 @@ namespace VisionToolDemo.Vision.Tasks
 
             // 图上画框 + 类别标签
             DrawBoxes(dst);
+        }
+
+        // ============================== 实例分割（YOLOv8-seg） ==============================
+
+        /// <summary>
+        /// 实例分割：YOLOv8-seg 模型两个输出——检测头 [1,4+nc,N]（与 v8 检测相同）
+        /// 与原型掩膜 [1,32,Hm,Wm]。流程：解析检测头 → 置信度过滤 → NMS → 对每个保留目标
+        /// 用 32 维原型系数加权原型掩膜 → sigmoid → 二值化 → 缩放到原图尺寸 →
+        /// 半透明紫色着色叠加 + 复用 DrawBoxes 画框与标签。
+        /// 掩膜坐标经 letterbox 缩放（padRatio）与 ROI 偏移映射回原图，与检测框一致。
+        /// </summary>
+        private void RunSegmentation(Mat dst, float[] detData, int[] detDims, float[] protoData,
+            float conf, float iou, int inputSide, float padRatio, int roiX, int roiY, int alphaPct)
+        {
+            // 1) 解析检测头：与 RunDetection 相同的 YOLOv5/v8 格式判别与转置
+            List<float[]> rows = new();
+            if (detDims.Length == 3 && detDims[0] == 1)
+            {
+                int small = Math.Min(detDims[1], detDims[2]);
+                int large = Math.Max(detDims[1], detDims[2]);
+                if (small >= 5 && large >= 1)
+                {
+                    if (detDims[2] == small)
+                    {
+                        // YOLOv5：行序天然（[1,N,5+C]）
+                        int n = detDims[1], cols = detDims[2];
+                        for (int i = 0; i < n; i++)
+                        {
+                            var row = new float[cols];
+                            Array.Copy(detData, i * cols, row, 0, cols);
+                            rows.Add(row);
+                        }
+                    }
+                    else
+                    {
+                        // YOLOv8：[1,4+C,N] 转置为行
+                        int cols = detDims[1], n = detDims[2];
+                        for (int i = 0; i < n; i++)
+                        {
+                            var row = new float[cols];
+                            for (int c = 0; c < cols; c++)
+                                row[c] = detData[c * n + i];
+                            rows.Add(row);
+                        }
+                    }
+                }
+            }
+            if (rows.Count == 0 || rows[0].Length < 5 + 32)
+            {
+                LastSummary = "深度学习推理(实例分割): 检测头形状异常（期望 YOLOv8-seg [1,4+C,N]，含 32 个原型系数）";
+                return;
+            }
+            int nCols = rows[0].Length;
+            int nClasses = Math.Max(0, nCols - 5 - 32);
+
+            // 2) 置信度过滤 + NMS（同类互相抑制）
+            var cands = new List<(float[] row, float score, int cls)>();
+            for (int i = 0; i < rows.Count; i++)
+            {
+                float[] row = rows[i];
+                float objScore = row[4];
+                float bestCls = 0;
+                int bestIdx = -1;
+                for (int c = 5; c < 5 + nClasses; c++)
+                {
+                    if (row[c] > bestCls) { bestCls = row[c]; bestIdx = c - 5; }
+                }
+                float score = nClasses > 1 ? objScore * bestCls : Math.Max(objScore, bestCls);
+                if (score < conf || bestIdx < 0) continue;
+                cands.Add((row, score, bestIdx));
+            }
+            cands.Sort((a, b) => b.score.CompareTo(a.score));
+            var keep = new List<(float[] row, float score, int cls)>();
+            foreach (var c in cands)
+            {
+                float cx = c.row[0], cy = c.row[1], bw = c.row[2], bh = c.row[3];
+                bool sup = false;
+                foreach (var k in keep)
+                {
+                    if (k.cls != c.cls) continue;
+                    float kcx = k.row[0], kcy = k.row[1], kbw = k.row[2], kbh = k.row[3];
+                    float ix = Math.Max(0, Math.Min(cx + bw / 2, kcx + kbw / 2) - Math.Max(cx - bw / 2, kcx - kbw / 2));
+                    float iy = Math.Max(0, Math.Min(cy + bh / 2, kcy + kbh / 2) - Math.Max(cy - bh / 2, kcy - kbh / 2));
+                    float inter = ix * iy;
+                    float union = bw * bh + kbw * kbh - inter;
+                    if (union > 0 && inter / union > iou) { sup = true; break; }
+                }
+                if (!sup) keep.Add(c);
+            }
+
+            // 3) 原型掩膜解码参数
+            int maskSize = protoData.Length / 32;          // 160×160=25600（自动适配不同分辨率）
+            int maskSide = (int)Math.Round(Math.Sqrt(maskSize));
+            if (maskSide * maskSide != maskSize || maskSize <= 0)
+            {
+                LastSummary = "深度学习推理(实例分割): 原型掩膜尺寸异常（" + string.Join("x", detDims) + "）";
+                return;
+            }
+            int inferW = (int)Math.Round(dst.Cols / padRatio * padRatio);   // 占位，下面按实际源图尺寸算
+            // 注意：dst 是原图尺寸；推理源是原图（ROI 模式为 ROI 子图）。掩膜先缩放到推理源尺寸，
+            // 再偏移到原图。这里 inferW/inferH 由掩膜缩放目标决定：padRatio 是原图→输入的放大倍率，
+            // 因此推理源尺寸 = 输入尺寸 × padRatio = 输入边长 / (1/padRatio)。
+            // 掩膜（输入尺寸）→ 推理源尺寸：直接 Resize 到 (round(inputSide*padRatio))。
+            int srcW = (int)Math.Round(inputSide * padRatio);
+            int srcH = (int)Math.Round(inputSide * padRatio);
+
+            // 4) 逐目标解码掩膜并叠加
+            LastBoxes.Clear();
+            int mi = 0;
+            foreach (var (row, score, cls) in keep)
+            {
+                mi++;
+                // 4.1 原型系数 × 原型 → 求和 → sigmoid
+                var raw = new float[maskSize];
+                int coeffStart = 5 + nClasses;
+                for (int c = 0; c < 32; c++)
+                {
+                    float coef = row[coeffStart + c];
+                    int baseIdx = c * maskSize;
+                    for (int i = 0; i < maskSize; i++)
+                        raw[i] += coef * protoData[baseIdx + i];
+                }
+                // sigmoid 并填成 Mat
+                using var maskSmall = new Mat(maskSide, maskSide, MatType.CV_32FC1);
+                for (int y = 0; y < maskSide; y++)
+                    for (int x = 0; x < maskSide; x++)
+                        maskSmall.Set<float>(y, x, (float)(1.0 / (1.0 + Math.Exp(-raw[y * maskSide + x]))));
+
+                // 4.2 缩放到推理源尺寸 → 二值化（>0.5 视为目标像素）
+                using var maskBig = new Mat();
+                Cv2.Resize(maskSmall, maskBig, new OpenCvSharp.Size(srcW, srcH), 0, 0, InterpolationFlags.Linear);
+                using var maskBin = new Mat();
+                Cv2.Threshold(maskBig, maskBin, 0.5, 255, ThresholdTypes.Binary);
+                using var mask8 = new Mat();
+                maskBin.ConvertTo(mask8, MatType.CV_8UC1);
+
+                // 4.3 半透明叠加：仅在掩膜像素上 dst = 颜色*α + dst*(1-α)
+                float a = alphaPct / 100f;
+                for (int y = 0; y < mask8.Rows && y < dst.Rows; y++)
+                {
+                    int dy = y + roiY;
+                    if (dy < 0 || dy >= dst.Rows) continue;
+                    for (int x = 0; x < mask8.Cols && x < dst.Cols; x++)
+                    {
+                        if (mask8.At<byte>(y, x) == 0) continue;
+                        int dx = x + roiX;
+                        if (dx < 0 || dx >= dst.Cols) continue;
+                        Vec3b v = dst.At<Vec3b>(dy, dx);
+                        dst.Set(dy, dx, new Vec3b(
+                            (byte)Math.Round(168 * a + v.Item0 * (1 - a)),
+                            (byte)Math.Round(85 * a + v.Item1 * (1 - a)),
+                            (byte)Math.Round(247 * a + v.Item2 * (1 - a))));
+                    }
+                }
+
+                // 4.4 记录框（映射回原图坐标，供 DrawBoxes 画框与标签）
+                float cx = row[0] * padRatio + roiX;
+                float cy = row[1] * padRatio + roiY;
+                float bw = row[2] * padRatio;
+                float bh = row[3] * padRatio;
+                string name = cls >= 0 && cls < Labels.Count ? Labels[cls] : "class " + cls;
+                LastBoxes.Add(new DetectBox
+                {
+                    X = cx - bw / 2f,
+                    Y = cy - bh / 2f,
+                    W = bw,
+                    H = bh,
+                    Class = cls,
+                    Score = score,
+                    Name = name,
+                });
+            }
+
+            DrawBoxes(dst);
+            LastSummary = string.Format(
+                "深度学习推理(实例分割): 检测 {0} 个目标（阈值 {1:P0}，掩膜不透明度 {2}%）",
+                keep.Count, conf, alphaPct);
         }
 
         // ============================== 滑窗多人/多目标检测（训练页自研模型） ==============================
