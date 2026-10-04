@@ -56,8 +56,8 @@ def main():
                     attr.t.CopyFrom(numpy_helper.from_array(arr, attr.t.name))
                 elif attr.type == onnx.AttributeProto.GRAPH:
                     fix_graph(attr.g)   # if/loop/scan 等子图
-        # 局部函数体里的 Constant 节点
-        for fn in g.function:
+        # 局部函数体里的 Constant 节点（onnx < 1.13 无 function 字段，用 getattr 防御）
+        for fn in getattr(g, "function", ()):
             for node in fn.node:
                 for attr in node.attribute:
                     if attr.type == onnx.AttributeProto.TENSOR and attr.t.data_type == TensorProto.FLOAT16:
