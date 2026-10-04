@@ -320,8 +320,10 @@ namespace VisionToolDemo.Vision.Tasks
                         dynamic inputTensor = BuildInputTensor(input, inType, new[] { 1, 3, inputSide, inputSide });
                         var inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(inName, inputTensor) };
                         using var results = _session.Run(inputs);
-                        // 输出也按实际元素类型读取（fp16 模型输出是 Float16，统一转 float32）
-                        var (outData, outDims) = ReadOutput(results.First());
+                        // 输出也按实际元素类型读取（fp16 模型输出是 Float16，统一转 float32；
+                        // 类型从 session.OutputMetadata 元数据取，NamedOnnxValue 无公开 ElementType）
+                        var outMeta = _session.OutputMetadata.FirstOrDefault();
+                        var (outData, outDims) = ReadOutput(results.First(), outMeta.Value.ElementDataType);
 
                         if (taskType == 0)
                             RunClassification(dst, outData, outDims, conf, topN, roiEnabled, roiRect);
@@ -461,13 +463,14 @@ namespace VisionToolDemo.Vision.Tasks
         }
 
         /// <summary>
-        /// 按模型输出张量的实际元素类型读取为 float[] + 维度：
+        /// 按模型输出的元素类型读取为 float[] + 维度（类型来自 session.OutputMetadata 元数据，
+        /// 不是 NamedOnnxValue——后者没有公开 ElementType 属性）。
         /// fp16 模型（yolov5 fp16 量化版）输出也是 Float16，AsTensor&lt;float&gt; 会抛类型不匹配，
         /// 这里统一转 float32 供后处理（分类 softmax / 检测解析）使用。
         /// </summary>
-        private static (float[] data, int[] dims) ReadOutput(NamedOnnxValue v)
+        private static (float[] data, int[] dims) ReadOutput(NamedOnnxValue v, TensorElementType elemType)
         {
-            switch (v.ElementType)
+            switch (elemType)
             {
                 case TensorElementType.Float:
                     {
@@ -491,7 +494,7 @@ namespace VisionToolDemo.Vision.Tasks
                         return (r, t.Dimensions.ToArray());
                     }
                 default:
-                    throw new NotSupportedException("模型输出元素类型 " + v.ElementType + " 暂不支持（常见 Float/Float16/Double）");
+                    throw new NotSupportedException("模型输出元素类型 " + elemType + " 暂不支持（常见 Float/Float16/Double）");
             }
         }
 
@@ -810,7 +813,8 @@ namespace VisionToolDemo.Vision.Tasks
                         var ins = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(inMeta.Key, tensor) };
                         using var results = _session.Run(ins);
                         // 输出按实际元素类型读取（fp16 模型输出自动转 float32）
-                        var (outData, _) = ReadOutput(results.First());
+                        var outMeta2 = _session.OutputMetadata.FirstOrDefault();
+                        var (outData, _) = ReadOutput(results.First(), outMeta2.Value.ElementDataType);
                         float[] logits = outData;
                         int C = Math.Max(1, logits.Length);
                         outClasses = C;
