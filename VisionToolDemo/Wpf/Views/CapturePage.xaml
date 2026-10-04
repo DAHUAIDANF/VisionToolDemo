@@ -24,7 +24,23 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="18" MaxWidth="980" HorizontalAlignment="Left">
 
-            <TextBlock Text="采集与通信" Style="{StaticResource PageHeader}" Margin="0,0,0,10" />
+            <DockPanel Margin="0,0,0,10">
+                <TextBlock DockPanel.Dock="Left" Text="采集与通信" Style="{StaticResource PageHeader}" VerticalAlignment="Center" />
+                <!-- 顶栏主题色点：与视觉流水线/训练/设置等页面统一，点击即时应用主题 -->
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="主题" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="20,0,10,0" />
+                    <Border x:Name="ThemeDot0" Width="24" Height="24" Margin="7,0,0,0" CornerRadius="12" BorderThickness="2"
+                            ToolTip="深蓝灰（默认）" MouseLeftButtonDown="ThemeDot_Click" Tag="0" />
+                    <Border x:Name="ThemeDot1" Width="24" Height="24" Margin="7,0,0,0" CornerRadius="12" BorderThickness="2"
+                            ToolTip="深墨绿" MouseLeftButtonDown="ThemeDot_Click" Tag="1" />
+                    <Border x:Name="ThemeDot2" Width="24" Height="24" Margin="7,0,0,0" CornerRadius="12" BorderThickness="2"
+                            ToolTip="深紫罗兰" MouseLeftButtonDown="ThemeDot_Click" Tag="2" />
+                    <Border x:Name="ThemeDot3" Width="24" Height="24" Margin="7,0,0,0" CornerRadius="12" BorderThickness="2"
+                            ToolTip="暖橙红" MouseLeftButtonDown="ThemeDot_Click" Tag="3" />
+                    <Border x:Name="ThemeDot4" Width="24" Height="24" Margin="7,0,0,0" CornerRadius="12" BorderThickness="2"
+                            ToolTip="亮色浅色" MouseLeftButtonDown="ThemeDot_Click" Tag="4" />
+                </StackPanel>
+            </DockPanel>
             <TextBlock Text="相机、PLC 与通用通信的连接和参数设置。连接状态全局共享：视觉算子和工作流通信节点直接取用。" 
                        Style="{StaticResource FaintText}" Margin="0,0,0,12" />
 

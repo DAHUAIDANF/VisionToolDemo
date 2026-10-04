@@ -1,8 +1,10 @@
 using System;
 using System.Globalization;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using VisionToolDemo.Vision.External;
 
@@ -37,7 +39,16 @@ namespace VisionToolDemo.Wpf.Views
             GenStopBox.SelectedIndex = 0;
             LoadConfig(new CaptureConfig());
             UpdateRows();
+            // 顶栏主题色点：按当前主题刷新高亮；切换主题后本页即时跟随
+            ThemeUi.RefreshDots(ThemeDot0, ThemeDot1, ThemeDot2, ThemeDot3, ThemeDot4);
+            ThemeManager.RegisterPage(this);
             Unloaded += (_, _) => CommHub.DisconnectAll();   // 页面离开即断开，避免残留句柄
+        }
+
+        /// <summary>顶栏主题色点点击：应用主题并刷新本页色点（全软件风格统一）</summary>
+        private void ThemeDot_Click(object sender, MouseButtonEventArgs e)
+        {
+            ThemeUi.ApplyFromClick(sender as Border, ThemeDot0, ThemeDot1, ThemeDot2, ThemeDot3, ThemeDot4);
         }
 
         // ==================== 配置读写 ====================
@@ -177,56 +188,95 @@ namespace VisionToolDemo.Wpf.Views
         {
             var cfg = Collect();
             cfg.ApplyToHub();
-            try
+            CamStatus.Text = "正在连接相机…";
+            BtnCamConnect.IsEnabled = false;
+            Task.Run(() =>
+            {
+                try
+                {
+                    ICameraSource cam;
+                    lock (CommHub.Sync)
+                    {
+                        CommHub.Camera?.Dispose();
+                        CommHub.Camera = null;
+                    }
+                    cam = cfg.CreateCamera();
+                    string err = cam.Open();
+                    if (err != null)
+                    {
+                        cam.Dispose();
+                        Dispatcher.Invoke(() => { CamStatus.Text = err; BtnCamConnect.IsEnabled = true; });
+                        return;
+                    }
+                    lock (CommHub.Sync) CommHub.Camera = cam;
+                    // 连接成功自动取一帧（后台线程取帧并转位图，避免 OpenCV 阻塞 UI）
+                    using var frame = CommHub.TryGrabCamera();
+                    bool ok = frame != null && !frame.Empty();
+                    BitmapSource bmp = ok ? MatImage.ToBitmapSource(frame) : null;
+                    string sizeTxt = ok ? string.Format("预览 {0}x{1}", frame.Cols, frame.Rows) : null;
+                    string statusTxt;
+                    lock (CommHub.Sync) statusTxt = CommHub.Camera?.Status ?? "已取帧";
+                    Dispatcher.Invoke(() =>
+                    {
+                        BtnCamConnect.IsEnabled = true;
+                        CamStatus.Text = statusTxt;
+                        if (bmp != null)
+                        {
+                            PreviewImage.Source = bmp;
+                            PreviewHint.Text = sizeTxt;
+                        }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Dispatcher.Invoke(() => { CamStatus.Text = "连接异常：" + ex.Message; BtnCamConnect.IsEnabled = true; });
+                }
+            });
+        }
+
+        private void BtnCamDisconnect_Click(object sender, RoutedEventArgs e)
+        {
+            CamStatus.Text = "正在断开…";
+            BtnCamConnect.IsEnabled = false;
+            Task.Run(() =>
             {
                 lock (CommHub.Sync)
                 {
                     CommHub.Camera?.Dispose();
                     CommHub.Camera = null;
                 }
-                var cam = cfg.CreateCamera();
-                string err = cam.Open();
-                if (err != null)
+                Dispatcher.Invoke(() =>
                 {
-                    cam.Dispose();
-                    CamStatus.Text = err;
-                    return;
-                }
-                lock (CommHub.Sync) CommHub.Camera = cam;
-                CamStatus.Text = cam.Status;
-                BtnCamGrab_Click(sender, e);   // 连接成功自动取一帧
-            }
-            catch (Exception ex)
-            {
-                CamStatus.Text = "连接异常：" + ex.Message;
-            }
-        }
-
-        private void BtnCamDisconnect_Click(object sender, RoutedEventArgs e)
-        {
-            lock (CommHub.Sync)
-            {
-                CommHub.Camera?.Dispose();
-                CommHub.Camera = null;
-            }
-            PreviewImage.Source = null;
-            PreviewHint.Text = "点击「取一帧预览」查看相机画面";
-            CamStatus.Text = "相机未连接";
+                    BtnCamConnect.IsEnabled = true;
+                    PreviewImage.Source = null;
+                    PreviewHint.Text = "点击「取一帧预览」查看相机画面";
+                    CamStatus.Text = "相机未连接";
+                });
+            });
         }
 
         private void BtnCamGrab_Click(object sender, RoutedEventArgs e)
         {
-            using var frame = CommHub.TryGrabCamera();
-            if (frame == null || frame.Empty())
+            CamStatus.Text = "正在取帧…";
+            Task.Run(() =>
             {
-                lock (CommHub.Sync)
-                    CamStatus.Text = CommHub.Camera?.Status ?? "相机未连接";
-                return;
-            }
-            PreviewImage.Source = MatImage.ToBitmapSource(frame);
-            PreviewHint.Text = string.Format("预览 {0}x{1}", frame.Cols, frame.Rows);
-            lock (CommHub.Sync)
-                CamStatus.Text = CommHub.Camera?.Status ?? "已取帧";
+                using var frame = CommHub.TryGrabCamera();
+                bool ok = frame != null && !frame.Empty();
+                BitmapSource bmp = ok ? MatImage.ToBitmapSource(frame) : null;
+                string sizeTxt = ok ? string.Format("预览 {0}x{1}", frame.Cols, frame.Rows) : null;
+                string statusTxt;
+                lock (CommHub.Sync) statusTxt = CommHub.Camera?.Status ?? "相机未连接";
+                Dispatcher.Invoke(() =>
+                {
+                    if (bmp != null)
+                    {
+                        PreviewImage.Source = bmp;
+                        PreviewHint.Text = sizeTxt;
+                        CamStatus.Text = statusTxt ?? "已取帧";
+                    }
+                    else CamStatus.Text = statusTxt ?? "相机未连接";
+                });
+            });
         }
 
         // ==================== PLC / 工控 ====================
@@ -237,7 +287,51 @@ namespace VisionToolDemo.Wpf.Views
         {
             var cfg = Collect();
             cfg.ApplyToHub();
-            try
+            PlcStatus.Text = "正在连接 PLC…";
+            BtnPlcConnect.IsEnabled = false;
+            Task.Run(() =>
+            {
+                try
+                {
+                    lock (CommHub.Sync)
+                    {
+                        (CommHub.PlcAny as IDisposable)?.Dispose();
+                        CommHub.PlcAny = null;
+                        CommHub.Plc = null;
+                    }
+                    object client = cfg.CreatePlcAny();
+                    string err = client switch
+                    {
+                        IPlcClient plc => plc.Connect(),
+                        ICommClient comm => comm.Connect(),
+                        _ => "未知客户端类型",
+                    };
+                    if (err != null)
+                    {
+                        (client as IDisposable)?.Dispose();
+                        Dispatcher.Invoke(() => { PlcStatus.Text = err; BtnPlcConnect.IsEnabled = true; });
+                        return;
+                    }
+                    lock (CommHub.Sync)
+                    {
+                        CommHub.PlcAny = client;
+                        if (client is IPlcClient p) CommHub.Plc = p;   // Modbus 同时挂到 Plc（节点用）
+                    }
+                    string st = StatusOf(client);
+                    Dispatcher.Invoke(() => { PlcStatus.Text = st; BtnPlcConnect.IsEnabled = true; });
+                }
+                catch (Exception ex)
+                {
+                    Dispatcher.Invoke(() => { PlcStatus.Text = "连接异常：" + ex.Message; BtnPlcConnect.IsEnabled = true; });
+                }
+            });
+        }
+
+        private void BtnPlcDisconnect_Click(object sender, RoutedEventArgs e)
+        {
+            PlcStatus.Text = "正在断开…";
+            BtnPlcConnect.IsEnabled = false;
+            Task.Run(() =>
             {
                 lock (CommHub.Sync)
                 {
@@ -245,42 +339,13 @@ namespace VisionToolDemo.Wpf.Views
                     CommHub.PlcAny = null;
                     CommHub.Plc = null;
                 }
-                object client = cfg.CreatePlcAny();
-                string err = client switch
+                Dispatcher.Invoke(() =>
                 {
-                    IPlcClient plc => plc.Connect(),
-                    ICommClient comm => comm.Connect(),
-                    _ => "未知客户端类型",
-                };
-                if (err != null)
-                {
-                    (client as IDisposable)?.Dispose();
-                    PlcStatus.Text = err;
-                    return;
-                }
-                lock (CommHub.Sync)
-                {
-                    CommHub.PlcAny = client;
-                    if (client is IPlcClient p) CommHub.Plc = p;   // Modbus 同时挂到 Plc（节点用）
-                }
-                PlcStatus.Text = StatusOf(client);
-            }
-            catch (Exception ex)
-            {
-                PlcStatus.Text = "连接异常：" + ex.Message;
-            }
-        }
-
-        private void BtnPlcDisconnect_Click(object sender, RoutedEventArgs e)
-        {
-            lock (CommHub.Sync)
-            {
-                (CommHub.PlcAny as IDisposable)?.Dispose();
-                CommHub.PlcAny = null;
-                CommHub.Plc = null;
-            }
-            PlcStatus.Text = "PLC 未连接";
-            PlcTestResult.Text = "（未测试）";
+                    BtnPlcConnect.IsEnabled = true;
+                    PlcStatus.Text = "PLC 未连接";
+                    PlcTestResult.Text = "（未测试）";
+                });
+            });
         }
 
         private static string StatusOf(object client) => client switch
@@ -302,55 +367,60 @@ namespace VisionToolDemo.Wpf.Views
             cfg.ApplyToHub();
             var client = CurrentPlc();
             if (client == null) { PlcTestResult.Text = "请先连接 PLC"; return; }
-            try
+            // 先在 UI 线程取控件值，后台线程只做网络读写
+            string addrText = PlcAddrBox.Text.Trim();
+            int addrVal = I(PlcAddrBox.Text);
+            bool mcWord = addrText.StartsWith("D", StringComparison.OrdinalIgnoreCase)
+                       || addrText.StartsWith("R", StringComparison.OrdinalIgnoreCase)
+                       || addrText.StartsWith("W", StringComparison.OrdinalIgnoreCase);
+            PlcTestResult.Text = "正在读取…";
+            Task.Run(() =>
             {
-                switch (client)
+                string result;
+                try
                 {
-                    case IPlcClient plc:
+                    switch (client)
                     {
-                        int addr = I(PlcAddrBox.Text);
-                        string err = CommHub.ReadPlc(addr, false, 1, out object[] vals);
-                        PlcTestResult.Text = err != null
-                            ? "读取失败：" + err
-                            : string.Format("读取 OK：寄存器[{0}] = {1}", addr, vals.Length > 0 ? vals[0] : "?");
-                        break;
-                    }
-                    case S7Client s7:
-                    {
-                        string addr = PlcAddrBox.Text.Trim();
-                        string err = s7.ReadValue(addr, out byte[] bytes);
-                        if (err != null) { PlcTestResult.Text = "S7 读取失败：" + err; break; }
-                        PlcTestResult.Text = string.Format("S7 读取 OK：{0} = {1}", addr, FormatS7(bytes, addr));
-                        break;
-                    }
-                    case McClient mc:
-                    {
-                        string addr = PlcAddrBox.Text.Trim();
-                        bool word = addr.StartsWith("D", StringComparison.OrdinalIgnoreCase)
-                                 || addr.StartsWith("R", StringComparison.OrdinalIgnoreCase)
-                                 || addr.StartsWith("W", StringComparison.OrdinalIgnoreCase);
-                        if (word)
+                        case IPlcClient plc:
                         {
-                            string err = mc.ReadWord(addr, out ushort v);
-                            PlcTestResult.Text = err != null ? "MC 读取失败：" + err : $"MC 读取 OK：{addr} = {v}";
+                            string err = CommHub.ReadPlc(addrVal, false, 1, out object[] vals);
+                            result = err != null
+                                ? "读取失败：" + err
+                                : string.Format("读取 OK：寄存器[{0}] = {1}", addrVal, vals.Length > 0 ? vals[0] : "?");
+                            break;
                         }
-                        else
+                        case S7Client s7:
                         {
-                            string err = mc.ReadBit(addr, out bool v);
-                            PlcTestResult.Text = err != null ? "MC 读取失败：" + err : $"MC 读取 OK：{addr} = {(v ? "ON" : "OFF")}";
+                            string err = s7.ReadValue(addrText, out byte[] bytes);
+                            result = err != null ? "S7 读取失败：" + err : string.Format("S7 读取 OK：{0} = {1}", addrText, FormatS7(bytes, addrText));
+                            break;
                         }
-                        break;
+                        case McClient mc:
+                        {
+                            if (mcWord)
+                            {
+                                string err = mc.ReadWord(addrText, out ushort v1);
+                                result = err != null ? "MC 读取失败：" + err : $"MC 读取 OK：{addrText} = {v1}";
+                            }
+                            else
+                            {
+                                string err = mc.ReadBit(addrText, out bool v2);
+                                result = err != null ? "MC 读取失败：" + err : $"MC 读取 OK：{addrText} = {(v2 ? "ON" : "OFF")}";
+                            }
+                            break;
+                        }
+                        default:
+                            result = "当前协议不支持读取测试";
+                            break;
                     }
-                    default:
-                        PlcTestResult.Text = "当前协议不支持读取测试";
-                        break;
+                    string st = StatusOf(client);
+                    Dispatcher.Invoke(() => { PlcTestResult.Text = result; PlcStatus.Text = st; });
                 }
-                PlcStatus.Text = StatusOf(client);
-            }
-            catch (Exception ex)
-            {
-                PlcTestResult.Text = "读取异常：" + ex.Message;
-            }
+                catch (Exception ex)
+                {
+                    Dispatcher.Invoke(() => PlcTestResult.Text = "读取异常：" + ex.Message);
+                }
+            });
         }
 
         private void BtnPlcWrite_Click(object sender, RoutedEventArgs e)
@@ -359,49 +429,55 @@ namespace VisionToolDemo.Wpf.Views
             cfg.ApplyToHub();
             var client = CurrentPlc();
             if (client == null) { PlcTestResult.Text = "请先连接 PLC"; return; }
-            try
+            // 先在 UI 线程取控件值
+            string addrText = PlcAddrBox.Text.Trim();
+            string valText = PlcValBox.Text.Trim();
+            int addrVal = I(PlcAddrBox.Text);
+            ushort wordVal = (ushort)Math.Clamp(I(PlcValBox.Text), 0, 65535);
+            bool mcWord = addrText.StartsWith("D", StringComparison.OrdinalIgnoreCase)
+                       || addrText.StartsWith("R", StringComparison.OrdinalIgnoreCase)
+                       || addrText.StartsWith("W", StringComparison.OrdinalIgnoreCase);
+            PlcTestResult.Text = "正在写入…";
+            Task.Run(() =>
             {
-                switch (client)
+                string result;
+                try
                 {
-                    case IPlcClient plc:
+                    switch (client)
                     {
-                        int addr = I(PlcAddrBox.Text);
-                        ushort val = (ushort)Math.Clamp(I(PlcValBox.Text), 0, 65535);
-                        string err = CommHub.WritePlc(addr, false, val);
-                        PlcTestResult.Text = err != null ? "写入失败：" + err : $"写入 OK：寄存器[{addr}] = {val}";
-                        break;
+                        case IPlcClient plc:
+                        {
+                            string err = CommHub.WritePlc(addrVal, false, wordVal);
+                            result = err != null ? "写入失败：" + err : $"写入 OK：寄存器[{addrVal}] = {wordVal}";
+                            break;
+                        }
+                        case S7Client s7:
+                        {
+                            byte[] v = S7ValueBytes(addrText, valText);
+                            if (v == null) { result = "值无法解析（按 S7 类型给十进制值）"; break; }
+                            string err = s7.WriteValue(addrText, v);
+                            result = err != null ? "S7 写入失败：" + err : $"S7 写入 OK：{addrText} = {valText}";
+                            break;
+                        }
+                        case McClient mc:
+                        {
+                            string err = mcWord ? mc.WriteWord(addrText, wordVal)
+                                : mc.WriteBit(addrText, valText != "0" && !string.Equals(valText, "OFF", StringComparison.OrdinalIgnoreCase));
+                            result = err != null ? "MC 写入失败：" + err : $"MC 写入 OK：{addrText} = {valText}";
+                            break;
+                        }
+                        default:
+                            result = "当前协议不支持写入测试";
+                            break;
                     }
-                    case S7Client s7:
-                    {
-                        string addr = PlcAddrBox.Text.Trim();
-                        byte[] val = S7ValueBytes(addr, PlcValBox.Text.Trim());
-                        if (val == null) { PlcTestResult.Text = "值无法解析（按 S7 类型给十进制值）"; break; }
-                        string err = s7.WriteValue(addr, val);
-                        PlcTestResult.Text = err != null ? "S7 写入失败：" + err : $"S7 写入 OK：{addr} = {PlcValBox.Text.Trim()}";
-                        break;
-                    }
-                    case McClient mc:
-                    {
-                        string addr = PlcAddrBox.Text.Trim();
-                        bool word = addr.StartsWith("D", StringComparison.OrdinalIgnoreCase)
-                                 || addr.StartsWith("R", StringComparison.OrdinalIgnoreCase)
-                                 || addr.StartsWith("W", StringComparison.OrdinalIgnoreCase);
-                        string err;
-                        if (word) err = mc.WriteWord(addr, (ushort)Math.Clamp(I(PlcValBox.Text), 0, 65535));
-                        else err = mc.WriteBit(addr, PlcValBox.Text.Trim() != "0" && !string.Equals(PlcValBox.Text.Trim(), "OFF", StringComparison.OrdinalIgnoreCase));
-                        PlcTestResult.Text = err != null ? "MC 写入失败：" + err : $"MC 写入 OK：{addr} = {PlcValBox.Text.Trim()}";
-                        break;
-                    }
-                    default:
-                        PlcTestResult.Text = "当前协议不支持写入测试";
-                        break;
+                    string st = StatusOf(client);
+                    Dispatcher.Invoke(() => { PlcTestResult.Text = result; PlcStatus.Text = st; });
                 }
-                PlcStatus.Text = StatusOf(client);
-            }
-            catch (Exception ex)
-            {
-                PlcTestResult.Text = "写入异常：" + ex.Message;
-            }
+                catch (Exception ex)
+                {
+                    Dispatcher.Invoke(() => PlcTestResult.Text = "写入异常：" + ex.Message);
+                }
+            });
         }
 
         /// <summary>把 UI 文本按 S7 地址类型转写入字节（小端序低字节在前）。</summary>
@@ -444,7 +520,58 @@ namespace VisionToolDemo.Wpf.Views
         {
             var cfg = Collect();
             cfg.ApplyToHub();
-            try
+            int gt = GenTypeBox.SelectedIndex;
+            GenStatus.Text = "正在连接…";
+            BtnGenConnect.IsEnabled = false;
+            Task.Run(() =>
+            {
+                try
+                {
+                    lock (CommHub.Sync)
+                    {
+                        CommHub.TcpClient?.Dispose(); CommHub.TcpClient = null;
+                        CommHub.UdpClient?.Dispose(); CommHub.UdpClient = null;
+                        CommHub.SerialClient?.Dispose(); CommHub.SerialClient = null;
+                    }
+                    string statusTxt;
+                    switch (gt)
+                    {
+                        case 0:
+                            var tcp = cfg.CreateTcp();
+                            string e1 = tcp.Connect();
+                            if (e1 != null) { tcp.Dispose(); statusTxt = e1; break; }
+                            lock (CommHub.Sync) CommHub.TcpClient = tcp;
+                            statusTxt = tcp.Status;
+                            break;
+                        case 1:
+                            var udp = cfg.CreateUdp();
+                            string e2 = udp.Connect();
+                            if (e2 != null) { udp.Dispose(); statusTxt = e2; break; }
+                            lock (CommHub.Sync) CommHub.UdpClient = udp;
+                            statusTxt = udp.Status;
+                            break;
+                        default:
+                            var sp = cfg.CreateSerial();
+                            string e3 = sp.Open();
+                            if (e3 != null) { sp.Dispose(); statusTxt = e3; break; }
+                            lock (CommHub.Sync) CommHub.SerialClient = sp;
+                            statusTxt = "串口已打开 " + cfg.SerialCom;
+                            break;
+                    }
+                    Dispatcher.Invoke(() => { GenStatus.Text = statusTxt; BtnGenConnect.IsEnabled = true; });
+                }
+                catch (Exception ex)
+                {
+                    Dispatcher.Invoke(() => { GenStatus.Text = "连接异常：" + ex.Message; BtnGenConnect.IsEnabled = true; });
+                }
+            });
+        }
+
+        private void BtnGenDisconnect_Click(object sender, RoutedEventArgs e)
+        {
+            GenStatus.Text = "正在断开…";
+            BtnGenConnect.IsEnabled = false;
+            Task.Run(() =>
             {
                 lock (CommHub.Sync)
                 {
@@ -452,47 +579,13 @@ namespace VisionToolDemo.Wpf.Views
                     CommHub.UdpClient?.Dispose(); CommHub.UdpClient = null;
                     CommHub.SerialClient?.Dispose(); CommHub.SerialClient = null;
                 }
-                switch (GenTypeBox.SelectedIndex)
+                Dispatcher.Invoke(() =>
                 {
-                    case 0:
-                        var tcp = cfg.CreateTcp();
-                        string e1 = tcp.Connect();
-                        if (e1 != null) { tcp.Dispose(); GenStatus.Text = e1; return; }
-                        lock (CommHub.Sync) CommHub.TcpClient = tcp;
-                        GenStatus.Text = tcp.Status;
-                        break;
-                    case 1:
-                        var udp = cfg.CreateUdp();
-                        string e2 = udp.Connect();
-                        if (e2 != null) { udp.Dispose(); GenStatus.Text = e2; return; }
-                        lock (CommHub.Sync) CommHub.UdpClient = udp;
-                        GenStatus.Text = udp.Status;
-                        break;
-                    default:
-                        var sp = cfg.CreateSerial();
-                        string e3 = sp.Open();
-                        if (e3 != null) { sp.Dispose(); GenStatus.Text = e3; return; }
-                        lock (CommHub.Sync) CommHub.SerialClient = sp;
-                        GenStatus.Text = "串口已打开 " + cfg.SerialCom;
-                        break;
-                }
-            }
-            catch (Exception ex)
-            {
-                GenStatus.Text = "连接异常：" + ex.Message;
-            }
-        }
-
-        private void BtnGenDisconnect_Click(object sender, RoutedEventArgs e)
-        {
-            lock (CommHub.Sync)
-            {
-                CommHub.TcpClient?.Dispose(); CommHub.TcpClient = null;
-                CommHub.UdpClient?.Dispose(); CommHub.UdpClient = null;
-                CommHub.SerialClient?.Dispose(); CommHub.SerialClient = null;
-            }
-            GenStatus.Text = "通用通信未连接";
-            GenRecvHint.Text = "未接收";
+                    BtnGenConnect.IsEnabled = true;
+                    GenStatus.Text = "通用通信未连接";
+                    GenRecvHint.Text = "未接收";
+                });
+            });
         }
 
         private void BtnGenSend_Click(object sender, RoutedEventArgs e)
@@ -503,43 +596,64 @@ namespace VisionToolDemo.Wpf.Views
                 GenStatus.Text = "发送内容无法解析：HEX 模式请输入空格分隔的十六进制，如 01 03 00 00 00 01";
                 return;
             }
-            lock (CommHub.Sync)
+            int gt = GenTypeBox.SelectedIndex;
+            GenStatus.Text = "正在发送…";
+            Task.Run(() =>
             {
-                switch (GenTypeBox.SelectedIndex)
+                string statusTxt = null;
+                byte[] recv = null;
+                try
                 {
-                    case 0:
-                        var tcp = CommHub.TcpClient;
-                        if (tcp == null || !tcp.IsConnected) { GenStatus.Text = "TCP 未连接"; break; }
-                        string e1 = tcp.SendReceive(payload, out byte[] r1);
-                        GenStatus.Text = e1 ?? tcp.Status;
-                        if (e1 == null) ShowRecv(r1);
-                        break;
-                    case 1:
-                        var udp = CommHub.UdpClient;
-                        if (udp == null || !udp.IsConnected) { GenStatus.Text = "UDP 未连接"; break; }
-                        string e2 = udp.SendReceive(payload, out byte[] r2);
-                        GenStatus.Text = e2 ?? udp.Status;
-                        if (e2 == null) ShowRecv(r2);
-                        break;
-                    default:
-                        var sp = CommHub.SerialClient;
-                        if (sp == null || !sp.IsOpen) { GenStatus.Text = "串口未打开"; break; }
-                        string e3 = sp.Write(payload);
-                        if (e3 != null) { GenStatus.Text = e3; break; }
-                        // 串口发送后尝试读回显（超时内）
-                        byte[] buf = new byte[4096];
-                        System.Threading.Thread.Sleep(60);
-                        int n = sp.Read(buf, buf.Length);
-                        GenStatus.Text = n > 0 ? string.Format("串口发送 OK，收到 {0} 字节", n) : "串口发送 OK（无回显）";
-                        if (n > 0)
+                    lock (CommHub.Sync)
+                    {
+                        switch (gt)
                         {
-                            byte[] r = new byte[n];
-                            Array.Copy(buf, r, n);
-                            ShowRecv(r);
+                            case 0:
+                                var tcp = CommHub.TcpClient;
+                                if (tcp == null || !tcp.IsConnected) { statusTxt = "TCP 未连接"; break; }
+                                string e1 = tcp.SendReceive(payload, out byte[] r1);
+                                statusTxt = e1 ?? tcp.Status;
+                                recv = e1 == null ? r1 : null;
+                                break;
+                            case 1:
+                                var udp = CommHub.UdpClient;
+                                if (udp == null || !udp.IsConnected) { statusTxt = "UDP 未连接"; break; }
+                                string e2 = udp.SendReceive(payload, out byte[] r2);
+                                statusTxt = e2 ?? udp.Status;
+                                recv = e2 == null ? r2 : null;
+                                break;
+                            default:
+                                var sp = CommHub.SerialClient;
+                                if (sp == null || !sp.IsOpen) { statusTxt = "串口未打开"; break; }
+                                string e3 = sp.Write(payload);
+                                if (e3 != null) { statusTxt = e3; break; }
+                                // 串口发送后尝试读回显（超时内）
+                                byte[] buf = new byte[4096];
+                                System.Threading.Thread.Sleep(60);
+                                int n = sp.Read(buf, buf.Length);
+                                statusTxt = n > 0 ? string.Format("串口发送 OK，收到 {0} 字节", n) : "串口发送 OK（无回显）";
+                                if (n > 0)
+                                {
+                                    byte[] r = new byte[n];
+                                    Array.Copy(buf, r, n);
+                                    recv = r;
+                                }
+                                break;
                         }
-                        break;
+                    }
                 }
-            }
+                catch (Exception ex)
+                {
+                    statusTxt = "发送异常：" + ex.Message;
+                }
+                byte[] recvCopy = recv;
+                string statusCopy = statusTxt;
+                Dispatcher.Invoke(() =>
+                {
+                    GenStatus.Text = statusCopy;
+                    if (recvCopy != null) ShowRecv(recvCopy);
+                });
+            });
         }
 
         private static byte[] ParsePayload(string text, bool hex)

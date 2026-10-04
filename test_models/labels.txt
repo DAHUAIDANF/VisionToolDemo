@@ -1,2 +1,2 @@
-red_class
-blue_class
+blue
+red
