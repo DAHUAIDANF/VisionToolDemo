@@ -13,6 +13,10 @@ namespace VisionToolDemo.Vision
         public string OpName { get; set; } = "";
         public int[] Values { get; set; } = Array.Empty<int>();
 
+        /// <summary>文本参数值（与 Values 槽位一一对应；仅 TextDefault 参数槽位有值，其余为 null）。
+        /// 旧链文件没有该字段时为 null，执行时按空文本处理。</summary>
+        public string[] Texts { get; set; }
+
         /// <summary>模板/参考图（PNG 的 base64；空 = 这个算子不需要模板）</summary>
         public string TemplatePngBase64 { get; set; } = "";
     }
@@ -127,6 +131,16 @@ namespace VisionToolDemo.Vision
                         }
 
                         var sw = Stopwatch.StartNew();
+                        // 文本参数注入：把链文件里的文本值写入算子的 NodeText（二维码内容等）
+                        if (task is Automation.IStringParamTask sp)
+                        {
+                            var defs = task.ParamDescriptions;
+                            int ti = -1;
+                            for (int j = 0; j < (defs?.Length ?? 0); j++)
+                                if (defs[j].TextDefault != null) { ti = j; break; }
+                            sp.NodeText = (ti >= 0 && step.Texts != null && ti < step.Texts.Length && step.Texts[ti] != null)
+                                ? step.Texts[ti] : "";
+                        }
                         Mat output = task.Execute(current, step.Values ?? Array.Empty<int>());
                         sw.Stop();
 

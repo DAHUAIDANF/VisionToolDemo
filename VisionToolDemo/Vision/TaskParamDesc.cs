@@ -18,6 +18,13 @@ namespace VisionToolDemo.Vision
         public string Tip { get; set; }
 
         /// <summary>
+        /// 文本参数：非 null 时该参数渲染为文本框（可输入任意字符串内容），
+        /// 在参数数组里仍占一个 int 槽位（值被忽略，文本经 IStringParamTask.NodeText 注入算子）。
+        /// 用于二维码内容等需要字符串的算子；默认 null = 普通数值参数。
+        /// </summary>
+        public string TextDefault { get; set; }
+
+        /// <summary>
         /// 算子是否支持"算子级 ROI"（在参数面板虚拟追加"启用ROI/X/Y/宽/高"5 个参数，
         /// 执行时由 PipelinePage 统一包装：只在框选区域内处理，区域外保持原图不变）。
         /// 只对"逐像素/局部变换、输出=处理后的图"这类算子置 true；检测/测量/统计类不适用。

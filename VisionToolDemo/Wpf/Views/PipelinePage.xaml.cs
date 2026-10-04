@@ -39,6 +39,9 @@ namespace VisionToolDemo.Wpf.Views
             /// 首次用到时惰性创建，之后一直复用。</summary>
             public IVisionTask Task;
             public int[] Values = Array.Empty<int>();
+            /// <summary>文本参数值（与 Values 槽位一一对应；仅 TextDefault 参数槽位有值，其余 null）。
+            /// 执行时经 IStringParamTask.NodeText 注入算子（二维码内容等）。</summary>
+            public string[] Texts = Array.Empty<string>();
             public Mat Template;               // 需要模板的算子（可空）
             public Mat Input;                  // 本步输入（= 上一步的输出；第 1 步 = 原图）。只引用不拥有，不 Dispose
             public Mat Output;                 // 上次运行的输出（可空）
@@ -499,6 +502,19 @@ namespace VisionToolDemo.Wpf.Views
 
         // ================================================================ 算子链
 
+        /// <summary>从浏览器预览算子构建链步文本参数数组（仅 TextDefault 槽位取当前 NodeText，其余 null）</summary>
+        private static string[] BuildStepTexts(IVisionTask task)
+        {
+            var defs = task?.ParamDescriptions;
+            if (defs == null || defs.Length == 0)
+                return Array.Empty<string>();
+            var texts = new string[defs.Length];
+            for (int i = 0; i < defs.Length; i++)
+                if (defs[i].TextDefault != null)
+                    texts[i] = (task as IStringParamTask)?.NodeText ?? defs[i].TextDefault;
+            return texts;
+        }
+
         private void AddStep_Click(object sender, object e)
         {
             if (_browserTask == null || OpList.SelectedItem is not CatalogItem item)
@@ -511,6 +527,7 @@ namespace VisionToolDemo.Wpf.Views
                 OpName = item.OpName,
                 Task = _browserTask,             // 复用浏览器里的实例：掩膜/卡尺这类状态型算子把框选/笔迹带进链
                 Values = (int[])_browserValues.Clone(),
+                Texts = BuildStepTexts(_browserTask),
             };
             // 「裁剪矩形」是个特殊的好用点：把视觉页当前拉的选区直接填进它的 X/Y/宽/高，
             // 于是"在图上选一块 → 裁剪 → 继续处理"三步就齐了，不用手抄坐标，也不依赖 ROI。
@@ -641,6 +658,51 @@ namespace VisionToolDemo.Wpf.Views
                     Margin = new Thickness(0, 0, 0, 8),
                     ToolTip = Ui.Tip(ParamDisplay.HelpText(def)),   // 永远有内容（图例 + 范围/默认 + 算子说明）
                 };
+
+                // 文本参数（TextDefault 非 null）：渲染文本框，内容存 ChainStep.Texts / 浏览器算子的 NodeText
+                if (def.TextDefault != null)
+                {
+                    wrap.Children.Add(new TextBlock
+                    {
+                        Text = def.ParamName,
+                        Style = (Style)FindResource("DimText"),
+                        TextWrapping = TextWrapping.Wrap,
+                    });
+                    string init = "";
+                    if (step != null && step.Texts != null && index < step.Texts.Length && step.Texts[index] != null)
+                        init = step.Texts[index];
+                    else if (task is IStringParamTask bsp)
+                        init = bsp.NodeText ?? "";
+                    else
+                        init = def.TextDefault;
+                    var tbox = new TextBox
+                    {
+                        Text = init,
+                        Margin = new Thickness(0, 4, 0, 0),
+                        Padding = new Thickness(6, 3, 6, 3),
+                        TextWrapping = TextWrapping.Wrap,
+                        AcceptsReturn = true,
+                        MinHeight = 30,
+                    };
+                    tbox.TextChanged += (_, _) =>
+                    {
+                        if (step != null)
+                        {
+                            if (step.Texts == null || step.Texts.Length != (task?.ParamDescriptions?.Length ?? 0))
+                                step.Texts = new string[task?.ParamDescriptions?.Length ?? 0];
+                            if (index < step.Texts.Length)
+                                step.Texts[index] = tbox.Text;
+                        }
+                        else if (task is IStringParamTask bsp)
+                        {
+                            bsp.NodeText = tbox.Text;   // 浏览器预览实时更新
+                        }
+                    };
+                    wrap.Children.Add(tbox);
+                    target.Children.Add(wrap);
+                    return;
+                }
+
                 // 第一行：参数名 + 取值图例（例如「区域   0=全屏 1=主屏 2=自定」）——
                 // 之前只显示 "区域:0"，用户根本不知道 0/1/2 是什么
                 wrap.Children.Add(new TextBlock
@@ -1208,6 +1270,17 @@ namespace VisionToolDemo.Wpf.Views
                         AutomationSupport.ApplyTemplate(task, step.Template);
                     }
                     var sw = System.Diagnostics.Stopwatch.StartNew();
+                    // 文本参数注入：把链步的文本值写入算子 NodeText（二维码内容等）；
+                    // 导入的旧链 Texts 为 null 时按空文本处理，算子内部有默认值兜底。
+                    if (task is IStringParamTask sp)
+                    {
+                        var defs = task.ParamDescriptions;
+                        int ti = -1;
+                        for (int j = 0; j < (defs?.Length ?? 0); j++)
+                            if (defs[j].TextDefault != null) { ti = j; break; }
+                        sp.NodeText = (ti >= 0 && step.Texts != null && ti < step.Texts.Length && step.Texts[ti] != null)
+                            ? step.Texts[ti] : "";
+                    }
                     // 参数防御：链文件/模板导入后 Values 可能缺失（null/短数组），
                     // 直接 Execute 会 paramValues[0] 越界。统一用默认值补足到 ParamDescriptions 长度
                     //（支持算子级 ROI 的算子再多补 5 个 ROI 参数位，未启用=整图处理，兼容旧链）。
@@ -2750,6 +2823,7 @@ namespace VisionToolDemo.Wpf.Views
                 {
                     OpName = s.OpName,
                     Values = (int[])(s.Values ?? Array.Empty<int>()).Clone(),
+                    Texts = s.Texts != null && s.Texts.Length > 0 ? (string[])s.Texts.Clone() : null,
                     TemplatePngBase64 = OperatorChain.EncodeTemplate(s.Template),
                 });
             return list;
@@ -2764,6 +2838,7 @@ namespace VisionToolDemo.Wpf.Views
                 {
                     OpName = d.OpName,
                     Values = d.Values ?? Array.Empty<int>(),
+                    Texts = d.Texts ?? Array.Empty<string>(),
                     Template = OperatorChain.DecodeTemplate(d.TemplatePngBase64),
                 });
             _editing = null;
