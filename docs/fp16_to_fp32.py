@@ -31,22 +31,40 @@ def main():
     dst = sys.argv[2] if len(sys.argv) > 2 else src.replace(".onnx", "_fp32.onnx")
 
     model = onnx.load(src)
-    graph = model.graph
 
     def fix_tensor_type(vi):
         t = vi.type.tensor_type
         if t.elem_type == TensorProto.FLOAT16:
             t.elem_type = TensorProto.FLOAT
 
-    # 输入 / 输出 / 中间张量声明类型
-    for vi in list(graph.input) + list(graph.output) + list(graph.value_info):
-        fix_tensor_type(vi)
+    def fix_graph(g):
+        """递归转换一个 GraphProto：输入/输出/中间张量类型 + 初始权重 + Constant 节点 + 子图"""
+        # 输入 / 输出 / 中间张量声明类型
+        for vi in list(g.input) + list(g.output) + list(g.value_info):
+            fix_tensor_type(vi)
+        # 初始权重
+        for init in g.initializer:
+            if init.data_type == TensorProto.FLOAT16:
+                arr = numpy_helper.to_array(init).astype(np.float32)
+                init.CopyFrom(numpy_helper.from_array(arr, init.name))
+        # 算子内的 Constant 张量（如 yolov5 Detect 层的 Mul 常量）——
+        # 只转 initializer 会漏掉它们，导致 Mul 一侧 float32、一侧 float16 的类型冲突
+        for node in g.node:
+            for attr in node.attribute:
+                if attr.type == onnx.AttributeProto.TENSOR and attr.t.data_type == TensorProto.FLOAT16:
+                    arr = numpy_helper.to_array(attr.t).astype(np.float32)
+                    attr.t.CopyFrom(numpy_helper.from_array(arr, attr.t.name))
+                elif attr.type == onnx.AttributeProto.GRAPH:
+                    fix_graph(attr.g)   # if/loop/scan 等子图
+        # 局部函数体里的 Constant 节点
+        for fn in g.function:
+            for node in fn.node:
+                for attr in node.attribute:
+                    if attr.type == onnx.AttributeProto.TENSOR and attr.t.data_type == TensorProto.FLOAT16:
+                        arr = numpy_helper.to_array(attr.t).astype(np.float32)
+                        attr.t.CopyFrom(numpy_helper.from_array(arr, attr.t.name))
 
-    # 初始权重
-    for init in graph.initializer:
-        if init.data_type == TensorProto.FLOAT16:
-            arr = numpy_helper.to_array(init).astype(np.float32)
-            init.CopyFrom(numpy_helper.from_array(arr, init.name))
+    fix_graph(model.graph)
 
     try:
         onnx.checker.check_model(model)
