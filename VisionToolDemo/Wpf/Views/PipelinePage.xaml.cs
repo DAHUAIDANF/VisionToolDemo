@@ -879,8 +879,15 @@ namespace VisionToolDemo.Wpf.Views
                     using (var probe = new InferenceSession(dlg.FileName))
                     {
                         var m = probe.InputMetadata.FirstOrDefault();
-                        inputInfo = string.Format("输入: {0} 类型:{1} 形状:[{2}]",
-                            m.Key, m.Value.ElementDataType, string.Join("x", m.Value.Dimensions));
+                        if (m.Key != null && m.Value != null)
+                        {
+                            inputInfo = string.Format("输入: {0} 类型:{1} 形状:[{2}]",
+                                m.Key, m.Value.ElementDataType, string.Join("x", m.Value.Dimensions));
+                        }
+                        else
+                        {
+                            inputInfo = "输入元数据为空（模型可能异常）";
+                        }
                     }
                     if (isSim)
                     {

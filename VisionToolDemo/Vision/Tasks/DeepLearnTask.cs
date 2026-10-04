@@ -258,6 +258,11 @@ namespace VisionToolDemo.Vision.Tasks
                 // 不再假设 float32+固定 640——模型输入是 Double/Int8 或边长非 640 时自动匹配，
                 // 彻底避免 "Tensor element data" / shape 不匹配类 InvalidArgument 错误。
                 var inMeta = _session.InputMetadata.FirstOrDefault();
+                if (inMeta.Key == null || inMeta.Value == null)
+                {
+                    LastSummary = "深度学习推理: 模型输入元数据为空（模型可能损坏或不含输入）";
+                    return dst;
+                }
                 string inName = inMeta.Key;
                 var inType = inMeta.Value.ElementDataType;
                 int[] inDims = inMeta.Value.Dimensions.ToArray();
@@ -323,7 +328,18 @@ namespace VisionToolDemo.Vision.Tasks
                         // 输出也按实际元素类型读取（fp16 模型输出是 Float16，统一转 float32；
                         // 类型从 session.OutputMetadata 元数据取，NamedOnnxValue 无公开 ElementType）
                         var outMeta = _session.OutputMetadata.FirstOrDefault();
-                        var (outData, outDims) = ReadOutput(results.First(), outMeta.Value.ElementDataType);
+                        if (outMeta.Key == null || outMeta.Value == null)
+                        {
+                            LastSummary = "深度学习推理: 模型输出元数据为空（模型可能损坏或不含输出）";
+                            return dst;
+                        }
+                        var outVal = results.FirstOrDefault();
+                        if (outVal == null)
+                        {
+                            LastSummary = "深度学习推理: 模型推理无输出结果";
+                            return dst;
+                        }
+                        var (outData, outDims) = ReadOutput(outVal, outMeta.Value.ElementDataType);
 
                         if (taskType == 0)
                             RunClassification(dst, outData, outDims, conf, topN, roiEnabled, roiRect);
@@ -781,6 +797,19 @@ namespace VisionToolDemo.Vision.Tasks
         {
             outClasses = -1;
             winCount = 0;
+
+            // 输入/输出元数据一次读取并判空（避免循环内每次 FirstOrDefault + NRE）
+            var inMeta = _session.InputMetadata.FirstOrDefault();
+            var outMeta = _session.OutputMetadata.FirstOrDefault();
+            if (inMeta.Key == null || inMeta.Value == null || outMeta.Key == null || outMeta.Value == null)
+            {
+                LastSummary = "深度学习推理(滑窗): 模型输入/输出元数据为空（模型可能损坏）";
+                return new List<DetectBox>();
+            }
+            var inType = inMeta.Value.ElementDataType;
+            var outType = outMeta.Value.ElementDataType;
+            string inName = inMeta.Key;
+
             int W = srcMat.Cols, H = srcMat.Rows;
             int sx = Math.Max(0, Math.Min(roi.X, W - 1)), sy = Math.Max(0, Math.Min(roi.Y, H - 1));
             int sw = Math.Min(roi.Width, W - sx), sh = Math.Min(roi.Height, H - sy);
@@ -807,14 +836,13 @@ namespace VisionToolDemo.Vision.Tasks
                         float[] input = BuildInput(resized, inputSide, out _);
                         if (input == null) continue;
                         // 输入张量按模型声明类型构造（与主推理路径一致，避免类型不匹配）
-                        var inMeta = _session.InputMetadata.FirstOrDefault();
-                        dynamic tensor = BuildInputTensor(input, inMeta.Value.ElementDataType,
-                                                          new[] { 1, 3, inputSide, inputSide });
-                        var ins = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(inMeta.Key, tensor) };
+                        dynamic tensor = BuildInputTensor(input, inType, new[] { 1, 3, inputSide, inputSide });
+                        var ins = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(inName, tensor) };
                         using var results = _session.Run(ins);
                         // 输出按实际元素类型读取（fp16 模型输出自动转 float32）
-                        var outMeta2 = _session.OutputMetadata.FirstOrDefault();
-                        var (outData, _) = ReadOutput(results.First(), outMeta2.Value.ElementDataType);
+                        var outVal = results.FirstOrDefault();
+                        if (outVal == null) continue;   // 单窗口无输出：跳过该窗口
+                        var (outData, _) = ReadOutput(outVal, outType);
                         float[] logits = outData;
                         int C = Math.Max(1, logits.Length);
                         outClasses = C;
