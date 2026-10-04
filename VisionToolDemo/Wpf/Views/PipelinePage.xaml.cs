@@ -899,8 +899,15 @@ namespace VisionToolDemo.Wpf.Views
                     if (dlg.ShowDialog() != true) return;
                     try
                     {
+                        // 标签清洗：兼容直接粘贴 coco.yaml / 带序号 / 带引号的常见格式
+                        // （"names:" 行、注释、"0: person"、"person"、"'person'"、"- person" 都能正确解析）
                         var lines = File.ReadAllLines(dlg.FileName)
                             .Select(l => l.Trim())
+                            .Where(l => l.Length > 0 && !l.StartsWith("names:") && !l.StartsWith("---") && !l.StartsWith("#"))
+                            .Select(l => l.StartsWith("- ") ? l.Substring(2).Trim() : l)
+                            .Select(l => (l.Length >= 2 && l[0] == '"' && l[l.Length - 1] == '"')
+                                      || (l.Length >= 2 && l[0] == '\'' && l[l.Length - 1] == '\'') ? l.Substring(1, l.Length - 2) : l)
+                            .Select(l => System.Text.RegularExpressions.Regex.Replace(l, @"^\d+\s*[:：]?\s*", ""))
                             .Where(l => l.Length > 0)
                             .ToList();
                         if (lines.Count == 0) { Warn("标签文件里没有内容"); return; }

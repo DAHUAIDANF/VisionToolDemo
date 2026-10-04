@@ -464,33 +464,44 @@ namespace VisionToolDemo.Vision.Tasks
             int inputSide, float padRatio, int roiX, int roiY)
         {
             // 统一为 [N, 5+C] 的框行
+            // YOLOv5：[1,N,5+C]（N 锚框数大、5+C 列数小）；YOLOv8：[1,4+C,N]（4+C 列数小、N 锚框数大）。
+            // 用「列数 vs N 谁小」判别格式，不写死通道上限：
+            // COCO 80 类模型 85/84 列、自定义多类模型列数更大，按列数 ≤40 判断会把合法模型误拒。
             List<float[]> boxes = new();
-            if (dims.Length == 3 && dims[0] == 1 && dims[2] >= 6 && dims[2] <= 40)
+            if (dims.Length == 3 && dims[0] == 1)
             {
-                // YOLOv5：输出 [1,N,5+C]，行序天然
-                float[] flat = outTensor.ToArray();
-                int n = dims[1], cols = dims[2];
-                for (int i = 0; i < n; i++)
+                int small = Math.Min(dims[1], dims[2]);
+                int large = Math.Max(dims[1], dims[2]);
+                if (small >= 5 && large >= 1)
                 {
-                    var row = new float[cols];
-                    Array.Copy(flat, i * cols, row, 0, cols);
-                    boxes.Add(row);
+                    float[] flat = outTensor.ToArray();
+                    if (dims[2] == small)
+                    {
+                        // YOLOv5：输出 [1,N,5+C]，行序天然（行数=N 锚框数、列数=5+C）
+                        int n = dims[1], cols = dims[2];
+                        for (int i = 0; i < n; i++)
+                        {
+                            var row = new float[cols];
+                            Array.Copy(flat, i * cols, row, 0, cols);
+                            boxes.Add(row);
+                        }
+                    }
+                    else
+                    {
+                        // YOLOv8：输出 [1,4+C,N]（4+C 在 dim1、N 锚框数在 dim2），转置成行
+                        int cols = dims[1], n = dims[2];
+                        for (int i = 0; i < n; i++)
+                        {
+                            var row = new float[cols];
+                            for (int c = 0; c < cols; c++)
+                                row[c] = flat[c * n + i];
+                            boxes.Add(row);
+                        }
+                    }
                 }
             }
-            else if (dims.Length == 3 && dims[1] >= 6 && dims[1] <= 40 && dims[2] >= 1)
-            {
-                // YOLOv8：输出 [1,4+C,N]（类别+4 在 dim1），转置成行
-                float[] flat = outTensor.ToArray();
-                int cols = dims[1], n = dims[2];
-                for (int i = 0; i < n; i++)
-                {
-                    var row = new float[cols];
-                    for (int c = 0; c < cols; c++)
-                        row[c] = flat[c * n + i];
-                    boxes.Add(row);
-                }
-            }
-            else
+
+            if (boxes.Count == 0)
             {
                 // 未知输出形状：不能硬猜，防御返回。
                 // [1,C]（2 维）是训练页导出的分类模型输出（logits），提示把任务类型改为 0=分类；
