@@ -467,12 +467,13 @@ namespace VisionToolDemo.Vision.Tasks
                         return new DenseTensor<sbyte>(d, shape);
                     }
                 case TensorElementType.Float16:
-                    {
-                        // fp16 模型（如量化导出的 yolov5 fp16）：数据先归一化到 0~1 再转 Half
-                        var d = new Half[data.Length];
-                        for (int i = 0; i < data.Length; i++) d[i] = (Half)data[i];
-                        return new DenseTensor<Half>(d, shape);
-                    }
+                    // ONNX Runtime 桌面版不支持构造 fp16 输入张量（DenseTensor<Half> 会触发
+                    // 内部 OrtValue.CreateFromTensorObject 的 NullReferenceException），
+                    // 不能硬来——明确提示改用 float32 模型或先转换模型。
+                    throw new NotSupportedException(
+                        "模型输入为 Float16（fp16 量化版模型）。ONNX Runtime 不支持构造 fp16 输入张量，" +
+                        "请改用 float32 模型（官方 yolov5s.onnx 即 float32），" +
+                        "或用转换脚本把模型转回 float32（见 docs/fp16_to_fp32.py）");
                 default:
                     throw new NotSupportedException("模型输入元素类型 " + type + " 暂不支持（常见 Float/Float16/Double/UInt8/Int8）");
             }
@@ -494,13 +495,10 @@ namespace VisionToolDemo.Vision.Tasks
                         return (t.ToArray(), t.Dimensions.ToArray());
                     }
                 case TensorElementType.Float16:
-                    {
-                        var t = v.AsTensor<Half>();
-                        var a = t.ToArray();
-                        var r = new float[a.Length];
-                        for (int i = 0; i < a.Length; i++) r[i] = (float)a[i];
-                        return (r, t.Dimensions.ToArray());
-                    }
+                    // 与输入同理：AsTensor<Half> 在桌面版同样会触发内部 NRE，明确提示
+                    throw new NotSupportedException(
+                        "模型输出为 Float16（fp16 量化版模型）。ONNX Runtime 不支持读取 fp16 输出张量，" +
+                        "请改用 float32 模型，或用转换脚本把模型转回 float32（见 docs/fp16_to_fp32.py）");
                 case TensorElementType.Double:
                     {
                         var t = v.AsTensor<double>();
