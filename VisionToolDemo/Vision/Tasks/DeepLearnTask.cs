@@ -316,17 +316,17 @@ namespace VisionToolDemo.Vision.Tasks
                             return dst;
                         }
 
-                        // 推理：输入张量按模型声明的元素类型构造（float32/double/int8…自动匹配）
+                        // 推理：输入张量按模型声明的元素类型构造（float32/fp16/double/int8…自动匹配）
                         dynamic inputTensor = BuildInputTensor(input, inType, new[] { 1, 3, inputSide, inputSide });
                         var inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(inName, inputTensor) };
                         using var results = _session.Run(inputs);
-                        var outTensor = results.First().AsTensor<float>();
-                        int[] outDims = outTensor.Dimensions.ToArray();
+                        // 输出也按实际元素类型读取（fp16 模型输出是 Float16，统一转 float32）
+                        var (outData, outDims) = ReadOutput(results.First());
 
                         if (taskType == 0)
-                            RunClassification(dst, outTensor, outDims, conf, topN, roiEnabled, roiRect);
+                            RunClassification(dst, outData, outDims, conf, topN, roiEnabled, roiRect);
                         else
-                            RunDetection(dst, outTensor, outDims, conf, iou, inputSide, padRatio,
+                            RunDetection(dst, outData, outDims, conf, iou, inputSide, padRatio,
                                          roiEnabled ? roiRect.X : 0, roiEnabled ? roiRect.Y : 0);
                     }
                 }
@@ -448,18 +448,60 @@ namespace VisionToolDemo.Vision.Tasks
                         for (int i = 0; i < data.Length; i++) d[i] = (sbyte)Math.Clamp(MathF.Round(data[i] * 255f) - 128f, -128, 127);
                         return new DenseTensor<sbyte>(d, shape);
                     }
+                case TensorElementType.Float16:
+                    {
+                        // fp16 模型（如量化导出的 yolov5 fp16）：数据先归一化到 0~1 再转 Half
+                        var d = new Half[data.Length];
+                        for (int i = 0; i < data.Length; i++) d[i] = (Half)data[i];
+                        return new DenseTensor<Half>(d, shape);
+                    }
                 default:
-                    throw new NotSupportedException("模型输入元素类型 " + type + " 暂不支持（常见 Float/Double/UInt8/Int8；Float16 请先转换为 float32 再导出）");
+                    throw new NotSupportedException("模型输入元素类型 " + type + " 暂不支持（常见 Float/Float16/Double/UInt8/Int8）");
+            }
+        }
+
+        /// <summary>
+        /// 按模型输出张量的实际元素类型读取为 float[] + 维度：
+        /// fp16 模型（yolov5 fp16 量化版）输出也是 Float16，AsTensor&lt;float&gt; 会抛类型不匹配，
+        /// 这里统一转 float32 供后处理（分类 softmax / 检测解析）使用。
+        /// </summary>
+        private static (float[] data, int[] dims) ReadOutput(NamedOnnxValue v)
+        {
+            switch (v.ElementType)
+            {
+                case TensorElementType.Float:
+                    {
+                        var t = v.AsTensor<float>();
+                        return (t.ToArray(), t.Dimensions.ToArray());
+                    }
+                case TensorElementType.Float16:
+                    {
+                        var t = v.AsTensor<Half>();
+                        var a = t.ToArray();
+                        var r = new float[a.Length];
+                        for (int i = 0; i < a.Length; i++) r[i] = (float)a[i];
+                        return (r, t.Dimensions.ToArray());
+                    }
+                case TensorElementType.Double:
+                    {
+                        var t = v.AsTensor<double>();
+                        var a = t.ToArray();
+                        var r = new float[a.Length];
+                        for (int i = 0; i < a.Length; i++) r[i] = (float)a[i];
+                        return (r, t.Dimensions.ToArray());
+                    }
+                default:
+                    throw new NotSupportedException("模型输出元素类型 " + v.ElementType + " 暂不支持（常见 Float/Float16/Double）");
             }
         }
 
         // ============================== 分类后端 ==============================
 
         /// <summary>分类：softmax 取前 N 类标注（类别名来自标签文件；无标签时显示 "class N"）</summary>
-        private void RunClassification(Mat dst, Tensor<float> outTensor, int[] dims, float conf, int topN,
+        private void RunClassification(Mat dst, float[] outData, int[] dims, float conf, int topN,
                                          bool roiEnabled, Rect roi)
         {
-            float[] logits = outTensor.ToArray();
+            float[] logits = outData;
             int nClasses = logits.Length;
             // softmax（数值稳定：减最大值再 exp）
             float max = logits.Max();
@@ -506,7 +548,7 @@ namespace VisionToolDemo.Vision.Tasks
         /// YOLOv8（[1,4+C,N]，先转置为 [1,N,4+C]）。置信度过滤 → NMS → 画框。
         /// 框坐标乘 padRatio 并扣除 letterbox 偏移后映射回原图。
         /// </summary>
-        private void RunDetection(Mat dst, Tensor<float> outTensor, int[] dims, float conf, float iou,
+        private void RunDetection(Mat dst, float[] outData, int[] dims, float conf, float iou,
             int inputSide, float padRatio, int roiX, int roiY)
         {
             // 统一为 [N, 5+C] 的框行
@@ -520,7 +562,6 @@ namespace VisionToolDemo.Vision.Tasks
                 int large = Math.Max(dims[1], dims[2]);
                 if (small >= 5 && large >= 1)
                 {
-                    float[] flat = outTensor.ToArray();
                     if (dims[2] == small)
                     {
                         // YOLOv5：输出 [1,N,5+C]，行序天然（行数=N 锚框数、列数=5+C）
@@ -528,7 +569,7 @@ namespace VisionToolDemo.Vision.Tasks
                         for (int i = 0; i < n; i++)
                         {
                             var row = new float[cols];
-                            Array.Copy(flat, i * cols, row, 0, cols);
+                            Array.Copy(outData, i * cols, row, 0, cols);
                             boxes.Add(row);
                         }
                     }
@@ -540,7 +581,7 @@ namespace VisionToolDemo.Vision.Tasks
                         {
                             var row = new float[cols];
                             for (int c = 0; c < cols; c++)
-                                row[c] = flat[c * n + i];
+                                row[c] = outData[c * n + i];
                             boxes.Add(row);
                         }
                     }
@@ -768,7 +809,9 @@ namespace VisionToolDemo.Vision.Tasks
                                                           new[] { 1, 3, inputSide, inputSide });
                         var ins = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(inMeta.Key, tensor) };
                         using var results = _session.Run(ins);
-                        float[] logits = results.First().AsTensor<float>().ToArray();
+                        // 输出按实际元素类型读取（fp16 模型输出自动转 float32）
+                        var (outData, _) = ReadOutput(results.First());
+                        float[] logits = outData;
                         int C = Math.Max(1, logits.Length);
                         outClasses = C;
                         float mx = logits.Max();
