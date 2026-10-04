@@ -254,26 +254,37 @@ namespace VisionToolDemo.Vision.Tasks
                     _modelPathLoaded = ModelPath;
                 }
 
-                // 输入边长 0=自动：从模型输入元数据读取正方形边长（训练页导出模型无需手填）
-                if (inputSide <= 0)
+                // 模型输入元数据（输入名/元素类型/维度）：推理张量严格按模型声明构造，
+                // 不再假设 float32+固定 640——模型输入是 Double/Int8 或边长非 640 时自动匹配，
+                // 彻底避免 "Tensor element data" / shape 不匹配类 InvalidArgument 错误。
+                var inMeta = _session.InputMetadata.FirstOrDefault();
+                string inName = inMeta.Key;
+                var inType = inMeta.Value.ElementDataType;
+                int[] inDims = inMeta.Value.Dimensions.ToArray();
+
+                // 输入边长：0=自动读取模型固定边长；手动填错时自动纠正为模型实际边长
+                if (inDims.Length == 4 && inDims[2] > 0 && inDims[3] > 0)
                 {
-                    var meta = _session.InputMetadata.FirstOrDefault();
-                    var dimsM = meta.Value.Dimensions;
-                    if (dimsM.Length == 4 && dimsM[2] > 0 && dimsM[2] == dimsM[3])
+                    if (inDims[2] != inDims[3])
                     {
-                        inputSide = (int)dimsM[2];   // [1,3,H,W] 取 H
-                    }
-                    else if (dimsM.Length == 4 && dimsM[2] > 0 && dimsM[3] > 0)
-                    {
-                        LastSummary = "深度学习推理: 模型输入非正方形 [" + dimsM[2] + "x" + dimsM[3] +
+                        LastSummary = "深度学习推理: 模型输入非正方形 [" + inDims[2] + "x" + inDims[3] +
                                       "]，请手动设置「输入边长」";
                         return dst;
                     }
                     if (inputSide <= 0)
                     {
-                        LastSummary = "深度学习推理: 自动读取模型输入尺寸失败，请手动设置「输入边长」";
-                        return dst;
+                        inputSide = inDims[2];   // 自动读取（推荐）
                     }
+                    else if (inputSide != inDims[2])
+                    {
+                        inputSide = inDims[2];   // 用户手动填错 → 以模型实际输入为准
+                    }
+                }
+                else if (inputSide <= 0)
+                {
+                    LastSummary = "深度学习推理: 自动读取模型输入尺寸失败（模型输入 [" +
+                                  string.Join("x", inDims) + "]），请手动设置「输入边长」";
+                    return dst;
                 }
 
                 {
@@ -305,9 +316,9 @@ namespace VisionToolDemo.Vision.Tasks
                             return dst;
                         }
 
-                        // 推理：取第一个输出
-                        var inputTensor = new DenseTensor<float>(input, new[] { 1, 3, inputSide, inputSide });
-                        var inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(_session.InputNames.First(), inputTensor) };
+                        // 推理：输入张量按模型声明的元素类型构造（float32/double/int8…自动匹配）
+                        dynamic inputTensor = BuildInputTensor(input, inType, new[] { 1, 3, inputSide, inputSide });
+                        var inputs = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(inName, inputTensor) };
                         using var results = _session.Run(inputs);
                         var outTensor = results.First().AsTensor<float>();
                         int[] outDims = outTensor.Dimensions.ToArray();
@@ -405,6 +416,41 @@ namespace VisionToolDemo.Vision.Tasks
                 }
             }
             return data;
+        }
+
+        /// <summary>
+        /// 按模型输入声明的元素类型构建 DenseTensor：float32 / double / uint8 / int8 自动匹配，
+        /// 避免 ONNX Runtime "Tensor element data"（输入类型不匹配）类错误。
+        /// uint8/int8 按 0~1 归一化数据回转到 0~255 / -128~127（ONNX 量化模型的常见输入约定）。
+        /// 其他类型（float16 等）抛出明确提示，不静默传错类型。
+        /// </summary>
+        private static object BuildInputTensor(float[] data, TensorElementType type, int[] shape)
+        {
+            switch (type)
+            {
+                case TensorElementType.Float:
+                    return new DenseTensor<float>(data, shape);
+                case TensorElementType.Double:
+                    {
+                        var d = new double[data.Length];
+                        for (int i = 0; i < data.Length; i++) d[i] = data[i];
+                        return new DenseTensor<double>(d, shape);
+                    }
+                case TensorElementType.UInt8:
+                    {
+                        var d = new byte[data.Length];
+                        for (int i = 0; i < data.Length; i++) d[i] = (byte)Math.Clamp(MathF.Round(data[i] * 255f), 0, 255);
+                        return new DenseTensor<byte>(d, shape);
+                    }
+                case TensorElementType.Int8:
+                    {
+                        var d = new sbyte[data.Length];
+                        for (int i = 0; i < data.Length; i++) d[i] = (sbyte)Math.Clamp(MathF.Round(data[i] * 255f) - 128f, -128, 127);
+                        return new DenseTensor<sbyte>(d, shape);
+                    }
+                default:
+                    throw new NotSupportedException("模型输入元素类型 " + type + " 暂不支持（常见 Float/Double/UInt8/Int8；Float16 请先转换为 float32 再导出）");
+            }
         }
 
         // ============================== 分类后端 ==============================
@@ -716,8 +762,11 @@ namespace VisionToolDemo.Vision.Tasks
                         // 正方形窗口 → 直接 letterbox（等比 scale=1，无灰边），BGR→RGB 归一化 NCHW
                         float[] input = BuildInput(resized, inputSide, out _);
                         if (input == null) continue;
-                        var tensor = new DenseTensor<float>(input, new[] { 1, 3, inputSide, inputSide });
-                        var ins = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(_session.InputNames.First(), tensor) };
+                        // 输入张量按模型声明类型构造（与主推理路径一致，避免类型不匹配）
+                        var inMeta = _session.InputMetadata.FirstOrDefault();
+                        dynamic tensor = BuildInputTensor(input, inMeta.Value.ElementDataType,
+                                                          new[] { 1, 3, inputSide, inputSide });
+                        var ins = new List<NamedOnnxValue> { NamedOnnxValue.CreateFromTensor(inMeta.Key, tensor) };
                         using var results = _session.Run(ins);
                         float[] logits = results.First().AsTensor<float>().ToArray();
                         int C = Math.Max(1, logits.Length);

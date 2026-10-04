@@ -873,8 +873,15 @@ namespace VisionToolDemo.Wpf.Views
                 if (dlg.ShowDialog() != true) return;
                 try
                 {
-                    // 当场验证能加载（构造 InferenceSession 即加载图），失败立刻提示，不拖到运行
-                    using (var probe = new InferenceSession(dlg.FileName)) { }
+                    // 当场验证能加载（构造 InferenceSession 即加载图），失败立刻提示，不拖到运行；
+                    // 同时读出模型输入元数据（输入名/元素类型/形状），状态栏显示，便于核对模型与参数
+                    string inputInfo = "";
+                    using (var probe = new InferenceSession(dlg.FileName))
+                    {
+                        var m = probe.InputMetadata.FirstOrDefault();
+                        inputInfo = string.Format("输入: {0} 类型:{1} 形状:[{2}]",
+                            m.Key, m.Value.ElementDataType, string.Join("x", m.Value.Dimensions));
+                    }
                     if (isSim)
                     {
                         sim.FeatureModelPath = dlg.FileName;
@@ -885,7 +892,7 @@ namespace VisionToolDemo.Wpf.Views
                         dl.ModelPath = dlg.FileName;
                         dl.UnloadModel();
                     }
-                    SetStatus("已加载模型：" + dlg.FileName);
+                    SetStatus("已加载模型：" + dlg.FileName + "（" + inputInfo + "）");
                 }
                 catch (Exception ex)
                 {
