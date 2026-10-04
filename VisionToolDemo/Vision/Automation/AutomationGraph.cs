@@ -35,6 +35,10 @@ namespace VisionToolDemo.Vision.Automation
         BreakLoop,      // 结束循环（循环体内提前跳出：由条件节点的分支连进来即可终止当前循环）
         Browser,        // 浏览器操作（识别/激活/刷新/后退/前进/滚动/打开网址）
         BrowserElement, // 浏览器元素（识别网页按钮/输入框：点击/输入/读文本）
+        // ↓ 以下为通信类节点（相机取图 / PLC 读写），追加在末尾保持老图兼容
+        CameraGrab,     // 相机取图（从采集页已连接的相机抓一帧作为当前图）
+        PlcRead,        // PLC 读取（读寄存器/线圈 → 全局变量）
+        PlcWrite,       // PLC 写入（寄存器/线圈 ← 常量或变量）
     }
 
     /// <summary>一个自动化节点</summary>
@@ -95,6 +99,9 @@ namespace VisionToolDemo.Vision.Automation
             AutoNodeKind.BreakLoop => "结束循环",
             AutoNodeKind.Browser => "浏览器操作",
             AutoNodeKind.BrowserElement => "浏览器元素",
+            AutoNodeKind.CameraGrab => "相机取图",
+            AutoNodeKind.PlcRead => "PLC读取",
+            AutoNodeKind.PlcWrite => "PLC写入",
             _ => "结束",
         };
 
@@ -120,6 +127,9 @@ namespace VisionToolDemo.Vision.Automation
             AutoNodeKind.Roi => "区域裁剪ROI",
             AutoNodeKind.Browser => "浏览器操作",
             AutoNodeKind.BrowserElement => "浏览器元素",
+            AutoNodeKind.CameraGrab => "相机取图",
+            AutoNodeKind.PlcRead => "PLC读取",
+            AutoNodeKind.PlcWrite => "PLC写入",
             _ => null,      // VisionOp 的算子由节点自带的 OpName 决定
         };
 
@@ -178,6 +188,14 @@ namespace VisionToolDemo.Vision.Automation
             AutoNodeKind.Roi =>
             [
                 ("区域变量名", "区域来源=变量 时用：变量值形如 10,20,300,200（X,Y,宽,高，逗号或空格分隔）；支持 {变量} 间接引用", false),
+            ],
+            AutoNodeKind.PlcRead =>
+            [
+                ("结果变量名", "读到的值写进这个变量（留空默认「PLC结果」）", false),
+            ],
+            AutoNodeKind.PlcWrite =>
+            [
+                ("值来源变量名", "值来源=变量 时用：取这个全局变量的数值写入 PLC（支持 {变量} 间接引用）", false),
             ],
             _ => [],
         };

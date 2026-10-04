@@ -85,8 +85,8 @@ namespace VisionToolDemo.Vision.Tasks
                 // 深度图按行读取（16U），直接写 float3 坐标
                 for (int y = 0; y < srcMat.Rows; y++)
                 {
-                    var row = srcMat.GetUnsafePointer(y);   // ushort*
-                    var outRow = cloud.GetUnsafePointer(y); // Vec3f*
+                    ushort* row = (ushort*)srcMat.Ptr(y);   // 行指针
+                    Vec3f* outRow = (Vec3f*)cloud.Ptr(y); // 行指针
                     for (int x = 0; x < srcMat.Cols; x++)
                     {
                         ushort d = ((ushort*)row)[x];

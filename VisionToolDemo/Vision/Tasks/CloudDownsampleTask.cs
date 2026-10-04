@@ -47,7 +47,7 @@ namespace VisionToolDemo.Vision.Tasks
             {
                 for (int y = 0; y < dst.Rows; y++)
                 {
-                    var row = dst.GetUnsafePointer(y);   // Vec3f*
+                    Vec3f* row = (Vec3f*)dst.Ptr(y);   // 行指针
                     for (int x = 0; x < dst.Cols; x++)
                     {
                         Vec3f p = ((Vec3f*)row)[x];

@@ -3,6 +3,8 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- 允许在 Linux 等非 Windows 环境交叉编译验证（Windows 上无副作用） -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <!-- 仅保留 WPF 界面（矢量渲染 + Grid 自动布局，按分辨率与 DPI 自适应）；
          经典 WinForms 界面已随项目清理移除 -->
     <UseWPF>true</UseWPF>

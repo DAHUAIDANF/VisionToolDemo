@@ -36,7 +36,7 @@ namespace VisionToolDemo.Vision.Tasks
             using Mat gray = new();
             srcMat.ConvertTo(gray, MatType.CV_8U, 255.0 / cap);
             Mat dst = new();
-            Cv2.ApplyColorMap(gray, dst, ColorConversionCodes.COLORMAP_JET);
+            Cv2.ApplyColorMap(gray, dst, ColormapTypes.Jet);
             return dst;
         }
     }

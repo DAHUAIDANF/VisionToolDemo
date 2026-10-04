@@ -78,6 +78,7 @@
                 <StackPanel x:Name="NavHost" Margin="0,10,0,0">
                     <RadioButton x:Name="NavAutomation" Style="{StaticResource NavButton}" Tag="&#xE7C3;" Content="工作流" IsChecked="True" Command="{Binding NavigateCommand}" CommandParameter="automation" />
                     <RadioButton x:Name="NavPipeline" Style="{StaticResource NavButton}" Tag="&#xE8B7;" Content="视觉" Command="{Binding NavigateCommand}" CommandParameter="pipeline" />
+                    <RadioButton x:Name="NavCapture" Style="{StaticResource NavButton}" Tag="&#xE786;" Content="采集" Command="{Binding NavigateCommand}" CommandParameter="capture" />
                     <RadioButton x:Name="NavCatalog" Style="{StaticResource NavButton}" Tag="&#xE8F1;" Content="算子" Command="{Binding NavigateCommand}" CommandParameter="catalog" />
                     <RadioButton x:Name="NavHistory" Style="{StaticResource NavButton}" Tag="&#xE81C;" Content="记录" Command="{Binding NavigateCommand}" CommandParameter="history" />
                     <RadioButton x:Name="NavHelp" Style="{StaticResource NavButton}" Tag="&#xE897;" Content="说明" Command="{Binding NavigateCommand}" CommandParameter="help" />

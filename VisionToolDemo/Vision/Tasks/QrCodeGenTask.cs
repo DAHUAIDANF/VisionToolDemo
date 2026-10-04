@@ -2,6 +2,7 @@ using System;
 using OpenCvSharp;
 using ZXing;
 using ZXing.QrCode;
+using ZXing.QrCode.Internal;
 using VisionToolDemo.Vision.Automation;
 
 namespace VisionToolDemo.Vision.Tasks

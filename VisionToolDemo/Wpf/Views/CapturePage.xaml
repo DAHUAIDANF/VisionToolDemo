@@ -1,0 +1,388 @@
+<UserControl x:Class="VisionToolDemo.Wpf.Views.CapturePage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource Bg}">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/VisionToolDemo;component/Wpf/Styles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- 通用下拉样式：背景/文字/边框跟随主题 -->
+            <Style x:Key="Cmb" TargetType="{x:Type ComboBox}">
+                <Setter Property="Height" Value="30" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="Background" Value="{DynamicResource InputBg}" />
+                <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+            </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="18" MaxWidth="980" HorizontalAlignment="Left">
+
+            <TextBlock Text="采集与通信" Style="{StaticResource PageHeader}" Margin="0,0,0,10" />
+            <TextBlock Text="相机、PLC 与通用通信的连接和参数设置。连接状态全局共享：视觉算子和工作流通信节点直接取用。" 
+                       Style="{StaticResource FaintText}" Margin="0,0,0,12" />
+
+            <!-- ==================== 相机连接 ==================== -->
+            <TextBlock Text="相机连接" Style="{StaticResource SectionHeader}" />
+            <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="相机类型" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <ComboBox x:Name="CamTypeBox" Grid.Column="1" Width="150" Style="{StaticResource Cmb}" SelectionChanged="CamTypeBox_SelectionChanged">
+                            <ComboBoxItem Content="USB / 内置相机" />
+                            <ComboBoxItem Content="海康 MVS" />
+                            <ComboBoxItem Content="大恒 Galaxy" />
+                        </ComboBox>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="12,0,0,0">
+                            <Button x:Name="BtnCamConnect" Content="连接" Style="{StaticResource PrimaryButton}" Height="30" Click="BtnCamConnect_Click" />
+                            <Button x:Name="BtnCamDisconnect" Content="断开" Style="{StaticResource FlatButton}" Height="30" Margin="6,0,0,0" Click="BtnCamDisconnect_Click" />
+                            <Button x:Name="BtnCamGrab" Content="取一帧预览" Style="{StaticResource FlatButton}" Height="30" Margin="6,0,0,0" Click="BtnCamGrab_Click" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- USB 参数行（相机类型=USB 时显示） -->
+                    <Grid x:Name="UsbRow" Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="索引" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <ComboBox x:Name="CamIndexBox" Grid.Column="1" Width="56" Style="{StaticResource Cmb}" />
+                        <TextBlock Text="后端" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <ComboBox x:Name="CamBackendBox" Grid.Column="3" Width="92" Style="{StaticResource Cmb}">
+                            <ComboBoxItem Content="DSHOW" />
+                            <ComboBoxItem Content="MSMF" />
+                            <ComboBoxItem Content="ANY" />
+                        </ComboBox>
+                        <TextBlock Text="宽" Style="{StaticResource DimText}" Grid.Column="4" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <TextBox x:Name="CamWBox" Grid.Column="5" Width="64" Text="0" VerticalContentAlignment="Center" />
+                        <TextBlock Text="高" Style="{StaticResource DimText}" Grid.Column="6" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <TextBox x:Name="CamHBox" Grid.Column="7" Width="64" Text="0" VerticalContentAlignment="Center" />
+                        <TextBlock Text="帧率" Style="{StaticResource DimText}" Grid.Column="8" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <TextBox x:Name="CamFpsBox" Grid.Column="9" Width="56" Text="0" VerticalContentAlignment="Center" />
+                        <TextBlock Text="（0=相机默认）" Style="{StaticResource FaintText}" Grid.Column="10" VerticalAlignment="Center" Margin="8,0,0,0" />
+                    </Grid>
+
+                    <Border x:Name="PreviewBox" Margin="0,10,0,0" Padding="2"
+                            Background="{DynamicResource InputBg}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                            HorizontalAlignment="Left" MinWidth="240" MinHeight="120">
+                        <StackPanel>
+                            <Image x:Name="PreviewImage" MaxWidth="460" MaxHeight="320" Stretch="Uniform" />
+                            <TextBlock x:Name="PreviewHint" Text="点击「取一帧预览」查看相机画面" Style="{StaticResource FaintText}" Margin="4" />
+                        </StackPanel>
+                    </Border>
+                    <TextBlock x:Name="CamStatus" Style="{StaticResource FaintText}" Margin="0,8,0,0" Text="相机未连接" />
+                </StackPanel>
+            </Border>
+
+            <!-- ==================== PLC / 工控连接 ==================== -->
+            <TextBlock Text="PLC / 工控连接" Style="{StaticResource SectionHeader}" />
+            <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="协议" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <ComboBox x:Name="PlcTypeBox" Grid.Column="1" Width="170" Style="{StaticResource Cmb}" SelectionChanged="PlcTypeBox_SelectionChanged">
+                            <ComboBoxItem Content="Modbus TCP（以太网）" />
+                            <ComboBoxItem Content="Modbus RTU（串口）" />
+                            <ComboBoxItem Content="西门子 S7（TCP）" />
+                            <ComboBoxItem Content="三菱 MC（TCP）" />
+                        </ComboBox>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="12,0,0,0">
+                            <Button x:Name="BtnPlcConnect" Content="连接" Style="{StaticResource PrimaryButton}" Height="30" Click="BtnPlcConnect_Click" />
+                            <Button x:Name="BtnPlcDisconnect" Content="断开" Style="{StaticResource FlatButton}" Height="30" Margin="6,0,0,0" Click="BtnPlcDisconnect_Click" />
+                            <Button x:Name="BtnPlcTest" Content="读取测试" Style="{StaticResource FlatButton}" Height="30" Margin="6,0,0,0" Click="BtnPlcTest_Click" />
+                            <Button x:Name="BtnPlcWrite" Content="写入测试" Style="{StaticResource FlatButton}" Height="30" Margin="6,0,0,0" Click="BtnPlcWrite_Click" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Modbus TCP 参数行 -->
+                    <Grid x:Name="TcpRow" Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="IP" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="PlcIpBox" Grid.Column="1" Width="110" Text="192.168.1.1" VerticalContentAlignment="Center" />
+                        <TextBlock Text="端口" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <TextBox x:Name="PlcPortBox" Grid.Column="3" Width="56" Text="502" VerticalContentAlignment="Center" />
+                        <TextBlock Text="单元ID" Style="{StaticResource DimText}" Grid.Column="4" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <TextBox x:Name="PlcUnitBox" Grid.Column="5" Width="48" Text="1" VerticalContentAlignment="Center" />
+                    </Grid>
+
+                    <!-- Modbus RTU 参数行 -->
+                    <Grid x:Name="RtuRow" Margin="0,10,0,0" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="串口" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="PlcComBox" Grid.Column="1" Width="64" Text="COM3" VerticalContentAlignment="Center" />
+                        <TextBlock Text="波特率" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <ComboBox x:Name="PlcBaudBox" Grid.Column="3" Width="92" Style="{StaticResource Cmb}">
+                            <ComboBoxItem Content="9600" />
+                            <ComboBoxItem Content="19200" />
+                            <ComboBoxItem Content="38400" />
+                            <ComboBoxItem Content="57600" />
+                            <ComboBoxItem Content="115200" />
+                        </ComboBox>
+                        <TextBlock Text="数据位" Style="{StaticResource DimText}" Grid.Column="4" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <ComboBox x:Name="PlcDataBox" Grid.Column="5" Width="52" Style="{StaticResource Cmb}">
+                            <ComboBoxItem Content="7" />
+                            <ComboBoxItem Content="8" />
+                        </ComboBox>
+                        <TextBlock Text="校验" Style="{StaticResource DimText}" Grid.Column="6" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <ComboBox x:Name="PlcParityBox" Grid.Column="7" Width="72" Style="{StaticResource Cmb}">
+                            <ComboBoxItem Content="无" />
+                            <ComboBoxItem Content="奇校验" />
+                            <ComboBoxItem Content="偶校验" />
+                        </ComboBox>
+                        <TextBlock Text="停止位" Style="{StaticResource DimText}" Grid.Column="8" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <ComboBox x:Name="PlcStopBox" Grid.Column="9" Width="52" Style="{StaticResource Cmb}">
+                            <ComboBoxItem Content="1" />
+                            <ComboBoxItem Content="2" />
+                        </ComboBox>
+                        <TextBlock Text="从站" Style="{StaticResource DimText}" Grid.Column="10" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <TextBox x:Name="PlcSlaveBox" Grid.Column="11" Width="48" Text="1" VerticalContentAlignment="Center" />
+                    </Grid>
+
+                    <!-- 西门子 S7 参数行 -->
+                    <Grid x:Name="S7Row" Margin="0,10,0,0" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="IP" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="S7IpBox" Grid.Column="1" Width="110" Text="192.168.0.1" VerticalContentAlignment="Center" />
+                        <TextBlock Text="端口" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <TextBox x:Name="S7PortBox" Grid.Column="3" Width="56" Text="102" VerticalContentAlignment="Center" />
+                        <TextBlock Text="机架" Style="{StaticResource DimText}" Grid.Column="4" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <TextBox x:Name="S7RackBox" Grid.Column="5" Width="44" Text="0" VerticalContentAlignment="Center" />
+                        <TextBlock Text="槽" Style="{StaticResource DimText}" Grid.Column="6" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <TextBox x:Name="S7SlotBox" Grid.Column="7" Width="44" Text="1" VerticalContentAlignment="Center" />
+                    </Grid>
+
+                    <!-- 三菱 MC 参数行 -->
+                    <Grid x:Name="McRow" Margin="0,10,0,0" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="IP" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="McIpBox" Grid.Column="1" Width="120" Text="192.168.3.250" VerticalContentAlignment="Center" />
+                        <TextBlock Text="端口" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <TextBox x:Name="McPortBox" Grid.Column="3" Width="56" Text="6000" VerticalContentAlignment="Center" />
+                    </Grid>
+
+                    <!-- 读写测试参数行 -->
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="地址" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="PlcAddrBox" Grid.Column="1" Width="130" Text="0" VerticalContentAlignment="Center" />
+                        <TextBlock Text="值" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <TextBox x:Name="PlcValBox" Grid.Column="3" Width="80" Text="0" VerticalContentAlignment="Center" />
+                        <TextBlock x:Name="PlcAddrHint" Style="{StaticResource FaintText}" Grid.Column="4" VerticalAlignment="Center" Margin="8,0,0,0"
+                                   Text="Modbus: 地址 0~65535；S7: DB1.DBW0 / MW20；MC: D100 / M10" TextWrapping="Wrap" />
+                    </Grid>
+
+                    <TextBlock x:Name="PlcTestResult" Style="{StaticResource FaintText}" Margin="0,8,0,0" Text="（未测试）" TextWrapping="Wrap" />
+                    <TextBlock x:Name="PlcStatus" Style="{StaticResource FaintText}" Margin="0,6,0,0" Text="PLC 未连接" />
+                </StackPanel>
+            </Border>
+
+            <!-- ==================== 通用通信（TCP/UDP/串口） ==================== -->
+            <TextBlock Text="通用通信（自定义协议）" Style="{StaticResource SectionHeader}" />
+            <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="类型" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <ComboBox x:Name="GenTypeBox" Grid.Column="1" Width="110" Style="{StaticResource Cmb}" SelectionChanged="GenTypeBox_SelectionChanged">
+                            <ComboBoxItem Content="TCP" />
+                            <ComboBoxItem Content="UDP" />
+                            <ComboBoxItem Content="串口" />
+                        </ComboBox>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="12,0,0,0">
+                            <Button x:Name="BtnGenConnect" Content="连接" Style="{StaticResource PrimaryButton}" Height="30" Click="BtnGenConnect_Click" />
+                            <Button x:Name="BtnGenDisconnect" Content="断开" Style="{StaticResource FlatButton}" Height="30" Margin="6,0,0,0" Click="BtnGenDisconnect_Click" />
+                            <Button x:Name="BtnGenSend" Content="发送" Style="{StaticResource FlatButton}" Height="30" Margin="6,0,0,0" Click="BtnGenSend_Click" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- TCP 参数 -->
+                    <Grid x:Name="GenTcpRow" Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="IP" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="GenTcpIpBox" Grid.Column="1" Width="110" Text="127.0.0.1" VerticalContentAlignment="Center" />
+                        <TextBlock Text="端口" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <TextBox x:Name="GenTcpPortBox" Grid.Column="3" Width="56" Text="1024" VerticalContentAlignment="Center" />
+                    </Grid>
+
+                    <!-- UDP 参数 -->
+                    <Grid x:Name="GenUdpRow" Margin="0,10,0,0" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="IP" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="GenUdpIpBox" Grid.Column="1" Width="110" Text="127.0.0.1" VerticalContentAlignment="Center" />
+                        <TextBlock Text="端口" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <TextBox x:Name="GenUdpPortBox" Grid.Column="3" Width="56" Text="5000" VerticalContentAlignment="Center" />
+                    </Grid>
+
+                    <!-- 串口参数 -->
+                    <Grid x:Name="GenSerialRow" Margin="0,10,0,0" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="串口" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="GenComBox" Grid.Column="1" Width="64" Text="COM3" VerticalContentAlignment="Center" />
+                        <TextBlock Text="波特率" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <ComboBox x:Name="GenBaudBox" Grid.Column="3" Width="92" Style="{StaticResource Cmb}">
+                            <ComboBoxItem Content="9600" />
+                            <ComboBoxItem Content="19200" />
+                            <ComboBoxItem Content="38400" />
+                            <ComboBoxItem Content="57600" />
+                            <ComboBoxItem Content="115200" />
+                        </ComboBox>
+                        <TextBlock Text="数据位" Style="{StaticResource DimText}" Grid.Column="4" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <ComboBox x:Name="GenDataBox" Grid.Column="5" Width="52" Style="{StaticResource Cmb}">
+                            <ComboBoxItem Content="7" />
+                            <ComboBoxItem Content="8" />
+                        </ComboBox>
+                        <TextBlock Text="校验" Style="{StaticResource DimText}" Grid.Column="6" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <ComboBox x:Name="GenParityBox" Grid.Column="7" Width="72" Style="{StaticResource Cmb}">
+                            <ComboBoxItem Content="无" />
+                            <ComboBoxItem Content="奇校验" />
+                            <ComboBoxItem Content="偶校验" />
+                        </ComboBox>
+                        <TextBlock Text="停止位" Style="{StaticResource DimText}" Grid.Column="8" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <ComboBox x:Name="GenStopBox" Grid.Column="9" Width="52" Style="{StaticResource Cmb}">
+                            <ComboBoxItem Content="1" />
+                            <ComboBoxItem Content="2" />
+                        </ComboBox>
+                    </Grid>
+
+                    <!-- 发送/接收 -->
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <CheckBox x:Name="GenHexBox" Content="HEX" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource Fg}" />
+                        <TextBox x:Name="GenSendBox" Grid.Column="1" Height="30" VerticalContentAlignment="Center"
+                                 Text="Hello" ToolTip="要发送的内容：勾选 HEX 时按空格分隔十六进制（如 01 03 00 00 00 01），否则按 UTF-8 文本发送" />
+                        <TextBlock x:Name="GenRecvHint" Grid.Column="2" Style="{StaticResource FaintText}" VerticalAlignment="Center" Margin="10,0,0,0" Text="未接收" />
+                    </Grid>
+                    <Border Margin="0,8,0,0" Padding="6" Background="{DynamicResource InputBg}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                            MinHeight="72" HorizontalAlignment="Stretch">
+                        <TextBlock x:Name="GenRecvBox" Style="{StaticResource FaintText}" Text="（接收区：发送后显示对方响应，HEX 显示，UTF-8 可读部分同时标注）" TextWrapping="Wrap" />
+                    </Border>
+                    <TextBlock x:Name="GenStatus" Style="{StaticResource FaintText}" Margin="0,6,0,0" Text="通用通信未连接" />
+                </StackPanel>
+            </Border>
+
+            <!-- ==================== 通信参数 ==================== -->
+            <TextBlock Text="通信参数" Style="{StaticResource SectionHeader}" />
+            <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="超时（毫秒）" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="TimeoutBox" Grid.Column="1" Width="70" Text="1500" VerticalContentAlignment="Center" />
+                        <TextBlock Text="自动重试" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
+                        <TextBox x:Name="RetryBox" Grid.Column="3" Width="48" Text="1" VerticalContentAlignment="Center" />
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button x:Name="BtnSaveCfg" Content="保存配置" Style="{StaticResource PrimaryButton}" Click="BtnSaveCfg_Click" />
+                        <Button x:Name="BtnLoadCfg" Content="恢复默认" Style="{StaticResource FlatButton}" Margin="6,0,0,0" Click="BtnLoadCfg_Click" />
+                        <TextBlock x:Name="CfgStatus" Style="{StaticResource FaintText}" VerticalAlignment="Center" Margin="12,0,0,0" Text="" />
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource FaintText}" Margin="0,10,0,0" TextWrapping="Wrap"
+                               Text="配置自动保存到 %APPDATA%\VisionToolDemo\capture.json。海康/大恒相机需先安装厂商 SDK（MVS / Galaxy），装好即用；串口（Modbus RTU / 通用串口）仅 Windows 可用；S7 / MC 按官方协议标准实现，未接真实 PLC 时先用测试工具核对。连接状态供「相机取图」「PLC读取/写入」节点与相关视觉算子共享。" />
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

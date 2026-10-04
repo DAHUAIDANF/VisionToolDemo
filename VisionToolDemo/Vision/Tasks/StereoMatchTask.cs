@@ -86,7 +86,7 @@ namespace VisionToolDemo.Vision.Tasks
                 uniquenessRatio: 10,
                 speckleWindowSize: 100,
                 speckleRange: 32,
-                mode: StereoSGBM.Mode.SGBM);
+                mode: StereoSGBMMode.SGBM);
             using Mat disp = new();
             sgbm.Compute(leftG, rightG, disp);   // CV_16S：值 = 视差×16
 

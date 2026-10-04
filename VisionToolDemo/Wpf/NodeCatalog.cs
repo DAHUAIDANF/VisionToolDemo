@@ -68,6 +68,9 @@ namespace VisionToolDemo.Wpf
 
             AddKind(AutoNodeKind.Capture, "采集", "屏幕截图（可存图、可隐藏本窗口）");
             AddKind(AutoNodeKind.Roi, "采集", "区域裁剪ROI：把当前图裁到指定区域并替换，后续节点只在该区域检测");
+            AddKind(AutoNodeKind.CameraGrab, "采集", "相机取图：从「采集」页已连接的相机抓一帧作为当前图");
+            AddKind(AutoNodeKind.PlcRead, "采集", "PLC读取：读寄存器/线圈 → 全局变量（Modbus TCP/RTU）");
+            AddKind(AutoNodeKind.PlcWrite, "采集", "PLC写入：写寄存器/线圈 ← 常量或变量（Modbus TCP/RTU）");
             AddKind(AutoNodeKind.Match, "定位匹配", "用模板匹配找目标，输出中心坐标");
             AddKind(AutoNodeKind.Ocr, "识别", "字符识别（OCR），文字进变量");
             AddKind(AutoNodeKind.Rule, "判定", "一条规则：数值范围/等于/包含/非空/下限");
@@ -124,6 +127,7 @@ namespace VisionToolDemo.Wpf
             if (Has("匹配", "定位", "特征", "形状", "模板")) return "定位匹配";
             if (Has("字符", "ocr", "条码", "二维码", "识别", "dm", "dpm", "文字", "深度学习", "onnx")) return "识别";
             if (Has("深度", "点云", "视差", "立体", "3d", "高度")) return "3D视觉";
+            if (Has("plc", "modbus", "通信", "相机取图", "grab")) return "采集";
             if (Has("判定", "合格", "ok", "ng", "计数", "统计")) return "判定逻辑";
             if (Has("保存", "写", "导出", "记录")) return "记录输出";
             return "其它";

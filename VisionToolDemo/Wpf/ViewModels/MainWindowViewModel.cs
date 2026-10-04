@@ -73,6 +73,7 @@ namespace VisionToolDemo.Wpf.ViewModels
         private static (string title, string sub) PageTitles(string key) => key switch
         {
             "pipeline" => ("视觉流水线", "挑算子 → 调参数 → 看结果（图像处理链）"),
+            "capture" => ("采集与通信", "相机（USB/海康/大恒）与 PLC（Modbus TCP/RTU）连接与参数设置"),
             "automation" => ("自动化工作流（节点）", "节点库 → 画布 → 实例属性 → 运行抽屉"),
             "catalog" => ("算子与节点总览", "全部算子按分类列出，可搜索、可看参数"),
             "history" => ("运行记录", "每轮的 trace / 事件 / 结果图，可回看追溯"),

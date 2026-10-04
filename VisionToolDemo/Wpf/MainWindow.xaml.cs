@@ -31,6 +31,7 @@ namespace VisionToolDemo.Wpf
         private SettingsPage _settingsPage;
         private TrainPage _trainPage;
         private HelpPage _helpPage;
+        private CapturePage _capturePage;
 
         public MainWindow()
         {
@@ -188,6 +189,7 @@ namespace VisionToolDemo.Wpf
             switch (key)
             {
                 case "pipeline": page = _pipelinePage ??= new PipelinePage(); break;
+                case "capture": page = _capturePage ??= new CapturePage(); break;
                 case "catalog": page = _catalogPage ??= new CatalogPage(); break;
                 case "history": page = _historyPage ??= new HistoryPage(); break;
                 case "help": page = _helpPage ??= new HelpPage(); break;
