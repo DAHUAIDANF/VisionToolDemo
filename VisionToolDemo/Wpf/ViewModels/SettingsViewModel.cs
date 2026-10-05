@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows.Input;
+using Avalonia;
 using VisionToolDemo.Vision;
 using VisionToolDemo.Vision.Automation;
 using VisionToolDemo.Wpf.Mvvm;
@@ -100,7 +101,8 @@ namespace VisionToolDemo.Wpf.ViewModels
             {
                 try
                 {
-                    System.Windows.Clipboard.SetText(ReportText ?? "");
+                    // Avalonia：剪贴板经主窗口的 TopLevel.Clipboard（异步 API）
+                    Wpf.Ui.CopyToClipboard(ReportText ?? "");
                     StatusRequested?.Invoke("报告已复制到剪贴板");
                 }
                 catch { /* 剪贴板被占用等异常忽略 */ }

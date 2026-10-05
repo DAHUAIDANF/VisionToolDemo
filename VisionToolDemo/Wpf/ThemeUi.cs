@@ -1,12 +1,12 @@
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
-using System.Windows.Media;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Media;
 
 namespace VisionToolDemo.Wpf
 {
     /// <summary>
-    /// 顶栏主题色点公共逻辑：5 个主题色点（深蓝灰/深墨绿/深紫罗兰/暖橙红/亮色浅色），
+    /// 顶栏主题色点公共逻辑（Avalonia 版）：5 个主题色点（深蓝灰/深墨绿/深紫罗兰/暖橙红/亮色浅色），
     /// 与设置页/训练页同源，点击即时应用主题并刷新本页色点高亮。
     /// 各页面顶栏统一调用，保证软件整体风格一致。
     /// </summary>
@@ -23,7 +23,7 @@ namespace VisionToolDemo.Wpf
                 dot.BorderBrush = new SolidColorBrush(Colors.Gray);
                 dot.BorderThickness = new Thickness(i == ThemeManager.Current ? 3 : 1);
                 dot.CornerRadius = new CornerRadius(12);
-                dot.ToolTip = (i == ThemeManager.Current ? "当前主题：" : "点击应用：") + t.Name;
+                ToolTip.SetTip(dot, (i == ThemeManager.Current ? "当前主题：" : "点击应用：") + t.Name);
             }
         }
 

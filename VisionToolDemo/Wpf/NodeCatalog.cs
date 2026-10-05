@@ -89,9 +89,15 @@ namespace VisionToolDemo.Wpf
             AddKind(AutoNodeKind.Http, "变量与脚本", "HTTP 请求：上报结果或取参数");
             AddKind(AutoNodeKind.TimerTrigger, "流程", "定时触发：按间隔节流，配合循环做周期采集/检测");
 
-            // 全部视觉算子（自动化专用的不列）
+            // 全部视觉算子（自动化专用的不列）。
+            // 注意去重：与「专用节点」同名的算子（鼠标点击/键盘输入/浏览器元素/相机取图/
+            // 命令行/表达式/HTTP请求）已在上面 AddKind 列出，注册表反射扫描还会再带一份，
+            // 不跳过会让节点库出现两个同名条目（用户反馈"节点库怎么有一些重复的算子"）。
+            var dedup = new HashSet<string>(list.Select(i => i.Title), StringComparer.Ordinal);
             foreach (string name in VisionTaskRegistry.GetVisionToolNames())
             {
+                if (dedup.Contains(name)) continue;
+                dedup.Add(name);
                 var task = VisionTaskRegistry.GetTask(name);
                 int pc = task?.ParamDescriptions?.Length ?? 0;
                 string cat = Classify(name);

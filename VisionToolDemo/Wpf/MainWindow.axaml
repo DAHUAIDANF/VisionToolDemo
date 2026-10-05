@@ -1,0 +1,142 @@
+<!-- 主窗口（Avalonia 版）：无边框自绘标题栏 + 左侧导航 + 内容区 + 状态栏。
+     主题颜色全部 DynamicResource 引用，切换主题即全界面跟随。
+     Avalonia 11：样式用 Classes 引用（无 Style= 属性）。 -->
+<Window x:Class="VisionToolDemo.Wpf.MainWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="VisionTool 视觉检测工作台"
+        Width="1360" Height="860" MinWidth="900" MinHeight="560"
+        WindowStartupLocation="CenterScreen"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        Background="{DynamicResource Bg}"
+        Foreground="{DynamicResource Fg}">
+
+    <Window.Styles>
+        <!-- 导航按钮（RadioButton class=nav）：图标(Path) + 文字；模板内不放状态样式，
+             hover/checked 用模板外层 /template/ 选择器样式（Avalonia 11 语法） -->
+        <Style Selector="RadioButton.nav">
+            <Setter Property="Foreground" Value="{DynamicResource FgDim}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="4,2" />
+            <Setter Property="Template">
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="4,8">
+                        <StackPanel HorizontalAlignment="Center" Spacing="4">
+                            <Path x:Name="Icon" Width="18" Height="18" Stretch="Uniform"
+                                  Stroke="{TemplateBinding Foreground}" StrokeThickness="1.4"
+                                  Data="{TemplateBinding Tag}" />
+                            <TextBlock Text="{TemplateBinding Content}" FontSize="11.5"
+                                       HorizontalAlignment="Center" Foreground="{TemplateBinding Foreground}" />
+                        </StackPanel>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="RadioButton.nav:pointerover /template/ Border#Bd">
+            <Setter Property="Background" Value="{DynamicResource PanelBg}" />
+        </Style>
+        <Style Selector="RadioButton.nav:pointerover">
+            <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+        </Style>
+        <Style Selector="RadioButton.nav:checked /template/ Border#Bd">
+            <Setter Property="Background" Value="{DynamicResource AccentDim}" />
+        </Style>
+        <Style Selector="RadioButton.nav:checked">
+            <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- ============ 自绘标题栏（颜色跟随主题） ============ -->
+        <Border Grid.Row="0" Background="{DynamicResource NavBg}" BorderBrush="{DynamicResource Line}"
+                BorderThickness="0,0,0,1" Padding="14,6">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <TextBlock Grid.Column="0" Text="VisionTool 视觉检测工作台" VerticalAlignment="Center"
+                           Classes="pageheader" Margin="2,0,12,0" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <!-- 系统按钮：矢量 Path 图形（不依赖图标字体）。关闭按钮 class=close 悬停红底。 -->
+                    <Button x:Name="BtnWinMin" Classes="winbutton" Tag="min"
+                            Command="{Binding WindowCommand}" CommandParameter="min" ToolTip.Tip="最小化">
+                        <Path Width="14" Height="14" Stretch="Uniform" Data="M1,10.5 H15 V13.5 H1 Z"
+                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                    </Button>
+                    <Button x:Name="BtnWinMax" Classes="winbutton" Tag="max"
+                            Command="{Binding WindowCommand}" CommandParameter="max" ToolTip.Tip="最大化/还原">
+                        <Path Width="14" Height="14" Stretch="Uniform" Data="M4,4 H12 V12 H4 Z"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              StrokeThickness="2" StrokeLineCap="Round" />
+                    </Button>
+                    <Button x:Name="BtnWinClose" Classes="winbutton close" Tag="close"
+                            Command="{Binding WindowCommand}" CommandParameter="close" ToolTip.Tip="关闭">
+                        <Path Width="14" Height="14" Stretch="Uniform" Data="M4,4 L12,12 M12,4 L4,12"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              StrokeThickness="2" StrokeLineCap="Round" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*">
+
+            <!-- ============ 左侧导航 ============ -->
+            <Border Grid.Column="0" Background="{DynamicResource NavBg}" BorderBrush="{DynamicResource Line}"
+                    BorderThickness="0,0,1,0">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Bottom" Margin="8,8,8,10">
+                        <TextBlock Text="v0.2" FontSize="11" Foreground="{DynamicResource FgFaint}"
+                                   HorizontalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel x:Name="NavHost" Margin="6,10,0,0" Spacing="2">
+                        <RadioButton x:Name="NavAutomation" Classes="nav" Tag="M2,2 H6 V6 H2 Z M10,10 H14 V14 H10 Z M6,4 H10 M4,6 V10 M10,4 V10"
+                                     Content="工作流" Command="{Binding NavigateCommand}" CommandParameter="automation" />
+                        <RadioButton x:Name="NavPipeline" Classes="nav" Tag="M2,2 H14 V14 H2 Z M2,9 L6,5 L10,9 M10,7 L12,9"
+                                     Content="视觉" Command="{Binding NavigateCommand}" CommandParameter="pipeline" />
+                        <RadioButton x:Name="NavCapture" Classes="nav" Tag="M1,3 H15 V13 H1 Z M6,3 L7,1 H9 L10,3 M5.5,8 A2.5,2.5 0 1 0 10.5,8 A2.5,2.5 0 1 0 5.5,8"
+                                     Content="采集" Command="{Binding NavigateCommand}" CommandParameter="capture" />
+                        <RadioButton x:Name="NavCatalog" Classes="nav" Tag="M2,3 H6 L7,5 H14 V13 H2 Z"
+                                     Content="算子" Command="{Binding NavigateCommand}" CommandParameter="catalog" />
+                        <RadioButton x:Name="NavHistory" Classes="nav" Tag="M8,2 A6,6 0 1 1 8,14 A6,6 0 1 1 8,2 M8,5 V8 L10.5,9.5"
+                                     Content="记录" Command="{Binding NavigateCommand}" CommandParameter="history" />
+                        <RadioButton x:Name="NavHelp" Classes="nav" Tag="M8,2 A6,6 0 1 1 8,14 A6,6 0 1 1 8,2 M8,6.5 V8 M8,10.2 H8.01"
+                                     Content="说明" Command="{Binding NavigateCommand}" CommandParameter="help" />
+                        <RadioButton x:Name="NavTrain" Classes="nav" Tag="M2,3 H6 V13 H2 Z M6,3 H14 V13 H6 Z M6,6 H14 M6,9 H14"
+                                     Content="训练" Command="{Binding NavigateCommand}" CommandParameter="train" />
+                        <RadioButton x:Name="NavSettings" Classes="nav" Tag="M8,3 V13 M3,8 H13 M8,5.5 A2.5,2.5 0 1 0 8,10.5 A2.5,2.5 0 1 0 8,5.5"
+                                     Content="设置" Command="{Binding NavigateCommand}" CommandParameter="settings" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- ============ 右侧：工具栏 + 内容 + 状态栏 ============ -->
+            <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto">
+
+                <Border Grid.Row="0" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource Line}"
+                        BorderThickness="0,0,0,1" Padding="12,8">
+                    <DockPanel>
+                        <TextBlock x:Name="TitleText" DockPanel.Dock="Left" Text="{Binding Title}"
+                                   Classes="pageheader" VerticalAlignment="Center" Margin="0,0,16,0" />
+                        <StackPanel x:Name="ToolHost" DockPanel.Dock="Right" Orientation="Horizontal"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        <TextBlock x:Name="SubTitleText" Classes="dimtext" VerticalAlignment="Center"
+                                   Text="{Binding SubTitle}" />
+                    </DockPanel>
+                </Border>
+
+                <ContentControl Grid.Row="1" x:Name="PageHost" />
+
+                <Border Grid.Row="2" Background="{DynamicResource NavBg}" BorderBrush="{DynamicResource Line}"
+                        BorderThickness="0,1,0,0" Padding="12,4">
+                    <DockPanel>
+                        <TextBlock x:Name="StatusRight" DockPanel.Dock="Right" Classes="fainttext"
+                                   VerticalAlignment="Center" Text="{Binding ScreenInfo}" />
+                        <TextBlock x:Name="StatusText" Classes="fainttext" VerticalAlignment="Center"
+                                   Text="{Binding Status}" />
+                    </DockPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

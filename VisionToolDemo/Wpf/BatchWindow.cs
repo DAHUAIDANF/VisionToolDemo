@@ -3,9 +3,12 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Windows;
-using System.Windows.Controls;
-using Microsoft.Win32;
+using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Controls.Primitives;
+using Avalonia.Platform.Storage;
 using VisionToolDemo.Vision;
 
 namespace VisionToolDemo.Wpf
@@ -88,7 +91,7 @@ namespace VisionToolDemo.Wpf
             Content = panel;
         }
 
-        private UIElement MakeBrowseRow(TextBox box, Action browse, string buttonText = "浏览…")
+        private Control MakeBrowseRow(TextBox box, Action browse, string buttonText = "浏览…")
         {
             var g = new Grid();
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -111,26 +114,47 @@ namespace VisionToolDemo.Wpf
                 : string.Format("将使用视觉页当前的算子里程（{0} 步）。", _currentChain.Count);
         }
 
-        private void BrowseIn()
+        private async void BrowseIn()
         {
-            var dlg = new OpenFolderDialog { Title = "选择要批量处理的图片文件夹" };
-            if (dlg.ShowDialog(this) == true) _inDir.Text = dlg.FolderName;
+            var dir = await PickFolderAsync("选择要批量处理的图片文件夹");
+            if (!string.IsNullOrEmpty(dir)) _inDir.Text = dir;
         }
 
-        private void BrowseOut()
+        private async void BrowseOut()
         {
-            var dlg = new OpenFolderDialog { Title = "选择结果输出文件夹（可留空）" };
-            if (dlg.ShowDialog(this) == true) _outDir.Text = dlg.FolderName;
+            var dir = await PickFolderAsync("选择结果输出文件夹（可留空）");
+            if (!string.IsNullOrEmpty(dir)) _outDir.Text = dir;
         }
 
-        private void BrowseChain()
+        private async void BrowseChain()
         {
-            var dlg = new OpenFileDialog { Title = "选择算子里程文件", Filter = "算子里程 (*.chain.json)|*.chain.json|JSON|*.json|所有文件|*.*" };
-            if (dlg.ShowDialog(this) == true)
+            var file = await PickFileAsync("选择算子里程文件");
+            if (!string.IsNullOrEmpty(file))
             {
-                _chainFile.Text = dlg.FileName;
+                _chainFile.Text = file;
                 _chainSource.SelectedIndex = 1;
             }
+        }
+
+        private async Task<string> PickFolderAsync(string title)
+        {
+            var tl = TopLevel.GetTopLevel(this);
+            if (tl == null) return null;
+            var dirs = await tl.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = title, AllowMultiple = false });
+            return dirs != null && dirs.Count > 0 ? dirs[0].TryGetLocalPath() : null;
+        }
+
+        private async Task<string> PickFileAsync(string title)
+        {
+            var tl = TopLevel.GetTopLevel(this);
+            if (tl == null) return null;
+            var files = await tl.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = title,
+                AllowMultiple = false,
+                FileTypeFilter = new[] { new FilePickerFileType("算子里程") { Patterns = new[] { "*.chain.json", "*.json" } } },
+            });
+            return files != null && files.Count > 0 ? files[0].TryGetLocalPath() : null;
         }
 
         private void Start()
@@ -162,8 +186,7 @@ namespace VisionToolDemo.Wpf
                     _bar.Value = Math.Min(done + 1, total);
                     _status.Text = string.Format(CultureInfo.InvariantCulture, "处理中… {0}/{1}  {2}", done, total, current);
                     // 让进度条真的能刷新（本方法是同步跑完的）
-                    System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { },
-                        System.Windows.Threading.DispatcherPriority.Background);
+                    Avalonia.Threading.Dispatcher.UIThread.RunJobs();
                 },
                 out string report, out string reportPath);
 

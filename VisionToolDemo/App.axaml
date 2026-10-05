@@ -1,0 +1,20 @@
+<!-- Avalonia 应用根：Fluent 主题 + 自定义 Styles（颜色资源 + 控件样式）。
+     主题切换原理：Styles.axaml 内所有颜色都经 {DynamicResource Key} 引用，
+     切换主题时 ThemeManager 替换 Application 级 MergedDictionaries 中的主题颜色字典，
+     动态引用自动跟随（Avalonia 11 样式系统：class 选择器 + /template/ 状态样式）。 -->
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="VisionToolDemo.App"
+             RequestedThemeVariant="Default">
+  <Application.Resources>
+    <!-- 通用字体族资源（样式 Setter 里 {StaticResource UiFont} 引用） -->
+    <FontFamily x:Key="UiFont">Microsoft YaHei UI, Segoe UI, Noto Sans CJK SC, sans-serif</FontFamily>
+    <FontFamily x:Key="MonoFont">Consolas, Cascadia Mono, Noto Sans Mono CJK SC, monospace</FontFamily>
+    <FontFamily x:Key="IconFont">Segoe UI Symbol, Noto Sans Symbols 2, sans-serif</FontFamily>
+  </Application.Resources>
+  <Application.Styles>
+    <FluentTheme />
+    <!-- 自定义控件样式（class 选择器体系），颜色 DynamicResource 随主题 -->
+    <StyleInclude Source="avares://VisionToolDemo/Wpf/Styles.axaml" />
+  </Application.Styles>
+</Application>

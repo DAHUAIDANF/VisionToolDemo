@@ -1,0 +1,22 @@
+<!-- 主题：暖橙红（暖色工作台） -->
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="Bg" Color="#221A16" />
+    <SolidColorBrush x:Key="PanelBg" Color="#282019" />
+    <SolidColorBrush x:Key="CardBg" Color="#44352A" />
+    <SolidColorBrush x:Key="CardBgHover" Color="#503F32" />
+    <SolidColorBrush x:Key="NavBg" Color="#17120E" />
+    <SolidColorBrush x:Key="Line" Color="#5A4A3B" />
+    <SolidColorBrush x:Key="Fg" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="FgDim" Color="#E6E6E6" />
+    <SolidColorBrush x:Key="FgFaint" Color="#C0C0C0" />
+    <SolidColorBrush x:Key="Accent" Color="#F08A3C" />
+    <SolidColorBrush x:Key="AccentDim" Color="#3A2A1D" />
+    <SolidColorBrush x:Key="Ok" Color="#45DEA8" />
+    <SolidColorBrush x:Key="Warn" Color="#FFC94A" />
+    <SolidColorBrush x:Key="Ng" Color="#FF8A8A" />
+    <SolidColorBrush x:Key="InputBg" Color="#150F0B" />
+    <SolidColorBrush x:Key="SelBg" Color="#5C4530" />
+    <SolidColorBrush x:Key="CardSubFg" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF" />
+</ResourceDictionary>

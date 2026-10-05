@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Threading.Tasks;
+using Avalonia.Platform.Storage;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -51,16 +53,21 @@ namespace VisionToolDemo.Wpf.Views
         /// 是界面卡顿的典型来源。
         /// </summary>
         private readonly System.Collections.Generic.List<EdgeVisual> _edges = new();
-        private readonly System.Collections.Generic.Dictionary<int, System.Windows.Shapes.Ellipse> _ports = new();
+        /// <summary>画布缩放/平移变换（x:Name 在 RenderTransform 内不生成字段，改为代码持有）</summary>
+        private readonly ScaleTransform ZoomT = new() { ScaleX = 1, ScaleY = 1 };
+        private readonly TranslateTransform PanT = new() { X = 40, Y = 40 };
+        private readonly System.Collections.Generic.Dictionary<int, Ellipse> _ports = new();
         private int _inspectedId = int.MinValue;
 
         private sealed class EdgeVisual
         {
             public int From, To;
             public bool Alt;
-            public System.Windows.Shapes.Path Path;
+            public PathShape Path;
             public PathFigure Fig;
-            public BezierSegment Seg;
+            // 3 段折线：每段独立 LineSegment（Point 是 Avalonia 属性，拖动改点必触发重绘，
+            // 比 PolyLineSegment.Points 索引赋值更可靠，避免拖动时连线"卡住/断开"）
+            public LineSegment[] Seg = new LineSegment[3];
         }
         private int _linkFrom = -1;                 // 正在连线的源节点（-1 = 未在连线）
         private bool _dragging;
@@ -90,6 +97,8 @@ namespace VisionToolDemo.Wpf.Views
         public AutomationPage(MainWindow shell)
         {
             InitializeComponent();
+            // Avalonia 不在 RenderTransform 属性值里生成 x:Name 字段，这里显式挂变换组
+            Surface.RenderTransform = new TransformGroup { Children = { ZoomT, PanT } };
             DataContext = Vm;
             Vm.OpenRecDirRequested += () => BtnOpenRecDir_Click(null, null);
             Vm.RefreshRecRequested += RefreshRecords;
@@ -117,16 +126,16 @@ namespace VisionToolDemo.Wpf.Views
         private void BuildToolbar()
         {
             if (_shell == null) return;
-            var items = new List<UIElement>();
+            var items = new List<Control>();
 
             Button Btn(string text, Action click, bool primary = false)
             {
                 var b = new Button
                 {
                     Content = text,
-                    Style = (Style)FindResource(primary ? "PrimaryButton" : "FlatButton"),
                     Margin = new Thickness(0, 0, 8, 0),
                 };
+                Ui.Class(b, primary ? "primary" : "flat");
                 b.Click += (_, _) => { try { click(); } catch (Exception ex) { Error(ex.Message); } };
                 items.Add(b);
                 return b;
@@ -151,7 +160,7 @@ namespace VisionToolDemo.Wpf.Views
             {
                 Content = "干跑(只记日志)",
                 IsChecked = true,
-                VerticalAlignment = VerticalAlignment.Center,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 0, 0),
             };
             dry.Checked += (_, _) => AutomationContext.DryRun = true;
@@ -179,7 +188,7 @@ namespace VisionToolDemo.Wpf.Views
             };
             searchTimer.Tick += (_, _) => { searchTimer.Stop(); RefreshLibrary(); };
             LibSearch.TextChanged += (_, _) => { searchTimer.Stop(); searchTimer.Start(); };
-            LibSearch.ToolTip = "输入算子名 / 节点名 / 分类任意片段";
+            ToolTip.SetTip(LibSearch, "输入算子名 / 节点名 / 分类任意片段");
             RefreshLibrary();
         }
 
@@ -202,8 +211,8 @@ namespace VisionToolDemo.Wpf.Views
                 {
                     Content = c + " " + count,
                     IsChecked = _category == c,
-                    Style = (Style)FindResource("Chip"),
                 };
+                Ui.Class(chip, "chip");
                 string cap = c;
                 chip.Click += (_, _) => { _category = cap; RefreshLibrary(); };
                 LibChips.Children.Add(chip);
@@ -221,13 +230,15 @@ namespace VisionToolDemo.Wpf.Views
             LibList.ItemsSource = shown;
         }
 
-        private void LibList_MouseDoubleClick(object sender, MouseButtonEventArgs e) => AddSelectedLibraryItem(null);
+        private void LibList_MouseDoubleClick(object sender, TappedEventArgs e) => AddSelectedLibraryItem(null);
 
-        private void LibList_PreviewMouseMove(object sender, MouseEventArgs e)
+        private void LibList_PreviewMouseMove(object sender, PointerEventArgs e)
         {
-            if (e.LeftButton != MouseButtonState.Pressed) return;
+            if (!e.GetCurrentPoint(null).Properties.IsLeftButtonPressed) return;
             if (LibList.SelectedItem is not CatalogItem item) return;
-            DragDrop.DoDragDrop(LibList, new DataObject("vtd.node", item), DragDropEffects.Copy);
+            var dataObj = new DataObject();
+            dataObj.Set("vtd.node", item);
+            DragDrop.DoDragDrop(e, dataObj, DragDropEffects.Copy);
         }
 
         private void AddSelectedLibraryItem(Point? dropAt)
@@ -337,20 +348,65 @@ namespace VisionToolDemo.Wpf.Views
             catch { }   // 备份失败不影响编辑
         }
 
+        /// <summary>按 from/to 相对位置计算连线几何（端口 + 正交折线 4 点）。
+        /// 目标在右侧：右出口→左入口，先水平→垂直→水平；
+        /// 左侧：左出口→右入口，同样正交；
+        /// 正下方：底出口→顶入口，先垂直→水平→垂直；
+        /// 正上方：顶出口→底入口，同样正交。
+        /// 正交折线始终是清晰单线，不会像贝塞尔那样在斜向连接时弯折成"两根线"。</summary>
+        private void ComputeEdgeGeometry(AutoNode from, AutoNode to,
+            out double x1, out double y1, out double x2, out double y2,
+            out double mx1, out double my1, out double mx2, out double my2)
+        {
+            bool toRight = to.X >= from.X + NodeW;
+            bool toLeft = to.X + NodeW <= from.X;
+            if (toRight || toLeft)
+            {
+                // 水平优先：从源左/右边中点出发，先进水平段到中点，再垂直对齐，最后水平进目标
+                x1 = toRight ? from.X + NodeW : from.X;
+                y1 = from.Y + NodeH / 2;
+                x2 = toRight ? to.X : to.X + NodeW;
+                y2 = to.Y + NodeH / 2;
+                double midX = (x1 + x2) / 2;
+                mx1 = midX; my1 = y1;
+                mx2 = midX; my2 = y2;
+            }
+            else if (to.Y >= from.Y + NodeH)   // 正下方：底出口 → 顶入口
+            {
+                x1 = from.X + NodeW / 2; y1 = from.Y + NodeH;
+                x2 = to.X + NodeW / 2; y2 = to.Y;
+                double midY = (y1 + y2) / 2;
+                mx1 = x1; my1 = midY;
+                mx2 = x2; my2 = midY;
+            }
+            else                               // 正上方：顶出口 → 底入口
+            {
+                x1 = from.X + NodeW / 2; y1 = from.Y;
+                x2 = to.X + NodeW / 2; y2 = to.Y + NodeH;
+                double midY = (y1 + y2) / 2;
+                mx1 = x1; my1 = midY;
+                mx2 = x2; my2 = midY;
+            }
+        }
+
         private void AddEdge(AutoNode from, AutoNode to, bool alt)
         {
-            double x1 = from.X + NodeW, y1 = from.Y + NodeH / 2;
-            double x2 = to.X, y2 = to.Y + NodeH / 2;
-            double dx = Math.Max(40, Math.Abs(x2 - x1) / 2);
+            ComputeEdgeGeometry(from, to,
+                out double x1, out double y1, out double x2, out double y2,
+                out double mx1, out double my1, out double mx2, out double my2);
 
-            var seg = new BezierSegment(
-                new Point(x1 + dx, y1), new Point(x2 - dx, y2), new Point(x2, y2), true);
             var fig = new PathFigure { StartPoint = new Point(x1, y1) };
-            fig.Segments.Add(seg);
+            var segs = new LineSegment[3];
+            segs[0] = new LineSegment { Point = new Point(mx1, my1) };
+            segs[1] = new LineSegment { Point = new Point(mx2, my2) };
+            segs[2] = new LineSegment { Point = new Point(x2, y2) };
+            fig.Segments.Add(segs[0]);
+            fig.Segments.Add(segs[1]);
+            fig.Segments.Add(segs[2]);
             var geo = new PathGeometry();
             geo.Figures.Add(fig);
 
-            var path = new System.Windows.Shapes.Path
+            var path = new PathShape
             {
                 Data = geo,
                 // 主出口灰色实线；副出口（条件/循环节点的"否"分支）黄色实线（用户要求不用虚线）
@@ -358,9 +414,9 @@ namespace VisionToolDemo.Wpf.Views
                 StrokeThickness = 2,
                 IsHitTestVisible = false,
             };
-            path.Background = Ui.Brush("FgDim");
+            path.Stroke = Ui.Brush(alt ? "Warn" : "FgDim");
             Surface.Children.Add(path);
-            _edges.Add(new EdgeVisual { From = from.Id, To = to.Id, Alt = alt, Path = path, Fig = fig, Seg = seg });
+            _edges.Add(new EdgeVisual { From = from.Id, To = to.Id, Alt = alt, Path = path, Fig = fig, Seg = segs });
         }
 
         /// <summary>只重画连线（节点视觉不动）—— 连线变了但节点没变时用，避免整画布重建</summary>
@@ -375,7 +431,9 @@ namespace VisionToolDemo.Wpf.Views
             }
         }
 
-        /// <summary>拖动节点时只挪这几条线的几何（直接改贝塞尔控制点，不新建对象）</summary>
+        /// <summary>拖动节点时只挪这几条线的几何（直接改每段 LineSegment 的 Point，不新建对象）。
+        /// LineSegment.Point 是 Avalonia 属性：赋值自带变更通知；最后 InvalidateVisual 兜底强制重绘，
+        /// 保证拖动过程中连线实时跟随、不会出现"节点移走了线还停在原地"的断开。</summary>
         private void UpdateEdgesFor(int nodeId)
         {
             foreach (var e in _edges)
@@ -384,13 +442,14 @@ namespace VisionToolDemo.Wpf.Views
                 var from = _graph.Get(e.From);
                 var to = _graph.Get(e.To);
                 if (from == null || to == null) continue;
-                double x1 = from.X + NodeW, y1 = from.Y + NodeH / 2;
-                double x2 = to.X, y2 = to.Y + NodeH / 2;
-                double dx = Math.Max(40, Math.Abs(x2 - x1) / 2);
+                ComputeEdgeGeometry(from, to,
+                    out double x1, out double y1, out double x2, out double y2,
+                    out double mx1, out double my1, out double mx2, out double my2);
                 e.Fig.StartPoint = new Point(x1, y1);
-                e.Seg.Point1 = new Point(x1 + dx, y1);
-                e.Seg.Point2 = new Point(x2 - dx, y2);
-                e.Seg.Point3 = new Point(x2, y2);
+                e.Seg[0].Point = new Point(mx1, my1);
+                e.Seg[1].Point = new Point(mx2, my2);
+                e.Seg[2].Point = new Point(x2, y2);
+                e.Path.InvalidateVisual();
             }
         }
 
@@ -404,7 +463,7 @@ namespace VisionToolDemo.Wpf.Views
                 kv.Value.BorderThickness = new Thickness(sel ? 2 : 1);
             }
             foreach (var kv in _ports)
-                kv.Value.Background = Ui.Brush("Accent");
+                kv.Value.Fill = Ui.Brush(kv.Key == _linkFrom ? "Warn" : "Accent");
         }
 
         private void AddNodeVisual(AutoNode n)
@@ -418,10 +477,10 @@ namespace VisionToolDemo.Wpf.Views
                 BorderThickness = new Thickness(n.Id == _selectedId ? 2 : 1),
                 Cursor = new Cursor(StandardCursorType.SizeAll),
                 Tag = n.Id,
-                ToolTip = NodeTooltip(n),
             };
+            ToolTip.SetTip(card, NodeTooltip(n));
             card.Background = Ui.Brush("CardBg");
-            card.Background = Ui.Brush("Line");
+            card.BorderBrush = Ui.Brush(n.Id == _selectedId ? "Accent" : "Line");
             Canvas.SetLeft(card, n.X);
             Canvas.SetTop(card, n.Y);
 
@@ -429,11 +488,11 @@ namespace VisionToolDemo.Wpf.Views
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-            var head = new StackPanel { Orientation = Orientation.Horizontal };
+            var head = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal };
             var idTxt = new TextBlock
             {
                 Text = "#" + n.Id,
-                FontWeight = FontWeights.Bold,
+                FontWeight = FontWeight.Bold,
                 Margin = new Thickness(0, 0, 6, 0),
             };
             idTxt.Foreground = Ui.Brush("FgDim");
@@ -441,7 +500,7 @@ namespace VisionToolDemo.Wpf.Views
             var titleTxt = new TextBlock
             {
                 Text = AutoNodeInfo.Title(n.Kind) + (n.Kind == AutoNodeKind.VisionOp ? " · " + (n.OpName ?? "") : ""),
-                FontWeight = FontWeights.SemiBold,
+                FontWeight = FontWeight.SemiBold,
                 TextTrimming = TextTrimming.CharacterEllipsis,
             };
             titleTxt.Foreground = Ui.Brush("Fg");   // 显式跟随主题（原为继承，主题切换后可能残留旧色）
@@ -461,7 +520,7 @@ namespace VisionToolDemo.Wpf.Views
             _summaryTexts[n.Id] = body;
 
             // 用到模板的节点：卡片右下角挂一张模板缩略图（几个匹配节点时能一眼分清）
-            FrameworkElement cardContent = grid;
+            Control cardContent = grid;
             var tpl = NodeUsesTemplate(n) ? _graph.GetNodeTemplate(n.Id) : null;
             if (tpl != null && !tpl.Empty())
             {
@@ -472,7 +531,7 @@ namespace VisionToolDemo.Wpf.Views
                     Width = 46,
                     Height = 46,
                     Margin = new Thickness(6, 0, 0, 0),
-                    VerticalAlignment = VerticalAlignment.Center,
+                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
                 };
                 var thumbFrame = new Border
                 {
@@ -480,8 +539,8 @@ namespace VisionToolDemo.Wpf.Views
                     CornerRadius = new CornerRadius(4),
                     Padding = new Thickness(1),
                     Child = thumb,
-                    ToolTip = Ui.Tip("本节点使用的模板图（缩略）"),
                 };
+                ToolTip.SetTip(thumbFrame, Ui.Tip("本节点使用的模板图（缩略）"));
                 thumbFrame.Background = Ui.Brush("InputBg");
                 thumbFrame.BorderBrush = Ui.Brush("Line");
                 var dock = new DockPanel();
@@ -503,10 +562,10 @@ namespace VisionToolDemo.Wpf.Views
                 Width = 14, Height = 14,
                 StrokeThickness = 1,
                 Cursor = new Cursor(StandardCursorType.Cross),
-                ToolTip = "点这里开始连线，再点目标节点；按 Esc 取消",
             };
-            port.Background = Ui.Brush("Accent");
-            port.Background = Ui.Brush("Bg");
+            ToolTip.SetTip(port, "点这里开始连线，再点目标节点；按 Esc 取消");
+            port.Fill = Ui.Brush(n.Id == _linkFrom ? "Warn" : "Accent");
+            port.Stroke = Ui.Brush("Bg");
             port.PointerPressed += (_, e) =>
             {
                 _linkFrom = _linkFrom == n.Id ? -1 : n.Id;
@@ -671,7 +730,7 @@ namespace VisionToolDemo.Wpf.Views
             BuildInspector();
         }
 
-        private void Node_MouseMove(object sender, MouseEventArgs e)
+        private void Node_MouseMove(object sender, PointerEventArgs e)
         {
             if (!_dragging || !e.GetCurrentPoint(null).Properties.IsLeftButtonPressed) return;
             var node = _graph.Get(_dragId);
@@ -723,7 +782,7 @@ namespace VisionToolDemo.Wpf.Views
             }
         }
 
-        private void CanvasHost_MouseMove(object sender, MouseEventArgs e)
+        private void CanvasHost_MouseMove(object sender, PointerEventArgs e)
         {
             if (!_panning) return;
             var p = e.GetPosition(CanvasHost);
@@ -881,12 +940,13 @@ namespace VisionToolDemo.Wpf.Views
 
         private void AddSection(string title)
         {
-            InspHost.Children.Add(new TextBlock
+            var sec = new TextBlock
             {
                 Text = title,
-                Style = (Style)FindResource("SectionHeader"),
                 Margin = new Thickness(0, InspHost.Children.Count == 0 ? 0 : 10, 0, 6),
-            });
+            };
+            Ui.Class(sec, "sectionheader");
+            InspHost.Children.Add(sec);
         }
 
         private void AddExitCombo(AutoNode n, string label, bool alt)
@@ -894,7 +954,7 @@ namespace VisionToolDemo.Wpf.Views
             var row = new Grid { Margin = new Thickness(0, 0, 0, 4) };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(74) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            var lb = new TextBlock { Text = label, Classes = { "dimtext" }, VerticalAlignment = VerticalAlignment.Center };
+            var lb = new TextBlock { Text = label, Classes = { "dimtext" }, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
             Grid.SetColumn(lb, 0);
             row.Children.Add(lb);
 
@@ -932,8 +992,8 @@ namespace VisionToolDemo.Wpf.Views
                 Text = label,
                 Classes = { "dimtext" },
                 Margin = new Thickness(0, 2, 0, 3),
-                ToolTip = Ui.Tip(tip),
             });
+            ToolTip.SetTip(InspHost.Children[InspHost.Children.Count - 1] as Control, tip);
 
             if (multiLine)
             {
@@ -946,9 +1006,8 @@ namespace VisionToolDemo.Wpf.Views
                     IsReadOnly = true,
                     MaxHeight = 60,
                     TextWrapping = TextWrapping.Wrap,
-                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    ToolTip = "点右侧「编辑…」用大窗口写（多行内容）",
                 };
+                ToolTip.SetTip(preview, "点右侧「编辑…」用大窗口写（多行内容）");
                 var btn = new Button { Content = "编辑…", Classes = { "flat" }, Margin = new Thickness(6, 0, 0, 0) };
                 btn.Click += (_, _) =>
                 {
@@ -968,7 +1027,8 @@ namespace VisionToolDemo.Wpf.Views
                 return;
             }
 
-            var box = new TextBox { Text = _graph.GetNodeString(n.Id, slot), ToolTip = Ui.Tip(tip) };
+                        var box = new TextBox { Text = _graph.GetNodeString(n.Id, slot) };
+            ToolTip.SetTip(box, tip);
             box.TextChanged += (_, _) =>
             {
                 _graph.SetNodeString(n.Id, slot, box.Text);
@@ -977,35 +1037,57 @@ namespace VisionToolDemo.Wpf.Views
             InspHost.Children.Add(box);
         }
 
+        /// <summary>VisionMaster 风格参数行：左列参数名（固定宽/可换行/悬停说明）+ 右列控件，
+        /// 行间细分割线；数值行当前值人话放在名称下方小字，随手柄/输入框实时更新。</summary>
         private void AddParamRow(AutoNode n, int index, TaskParamDesc def)
         {
             _graph.NormalizeParams();
             int cur = n.Params != null && index < n.Params.Length ? n.Params[index] : def.DefaultValue;
 
-            var wrap = new StackPanel
+            var rowBorder = new Border
             {
-                Margin = new Thickness(0, 2, 0, 6),
-                ToolTip = Ui.Tip(ParamDisplay.HelpText(def)),   // 图例 + 范围/默认 + 算子说明，永不空
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                BorderBrush = Ui.Brush("Line"),
+                Padding = new Thickness(0, 6, 0, 6),
             };
-            // 参数名 + 取值图例（如「区域   0=全屏 1=主屏 2=自定」），再一行当前值的人话
-            wrap.Children.Add(new TextBlock
+            var rowGrid = new Grid();
+            rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(128) });
+            rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            // 左列：参数名 + 取值图例 + 当前值人话，悬停给完整说明（图例 + 范围/默认 + 算子说明，永不空）
+            var namePanel = new StackPanel { VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
+            string label = ParamDisplay.LabelText(def);
+            namePanel.Children.Add(new TextBlock
             {
-                Text = ParamDisplay.LabelText(def),
+                Text = def.ParamName,
                 Classes = { "dimtext" },
+                FontSize = 12,
                 TextWrapping = TextWrapping.Wrap,
             });
-            wrap.Children.Add(new TextBlock
+            if (!string.IsNullOrEmpty(label) && label != def.ParamName)
+                namePanel.Children.Add(new TextBlock
+                {
+                    Text = label,
+                    Classes = { "fainttext" },
+                    FontSize = 10,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 1, 0, 0),
+                });
+            var valueLine = new TextBlock
             {
                 Text = ParamDisplay.NameOf(def) + " = " + ParamDisplay.ValueText(def, cur),
-                Style = (Style)FindResource("MonoText"),
+                Classes = { "monotext" },
+                FontSize = 10,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 2, 0, 0),
-            });
+            };
+            namePanel.Children.Add(valueLine);
+            ToolTip.SetTip(namePanel, ParamDisplay.HelpText(def));
+            Grid.SetColumn(namePanel, 0);
 
-            var row = new Grid { Margin = new Thickness(0, 2, 0, 0) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(76) });
-
+            // 右列：数值输入框（范围宽）或 滑杆+数值框（范围窄）
+            var ctrlPanel = new StackPanel { VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
+            Grid.SetColumn(ctrlPanel, 1);
             if (def.Max - def.Min > 400)
             {
                 var only = new TextBox { Text = cur.ToString(CultureInfo.InvariantCulture) };
@@ -1014,13 +1096,15 @@ namespace VisionToolDemo.Wpf.Views
                     if (_syncingParams) return;
                     if (!int.TryParse(only.Text, out int v)) return;
                     v = Math.Max(def.Min, Math.Min(def.Max, v));
-                    SetParam(n, index, v, def, wrap);
+                    SetParam(n, index, v, def, valueLine);
                 };
-                Grid.SetColumn(only, 0);
-                row.Children.Add(only);
+                ctrlPanel.Children.Add(only);
             }
             else
             {
+                var row = new Grid();
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(70) });
                 var slider = new Slider
                 {
                     Minimum = def.Min,
@@ -1028,7 +1112,7 @@ namespace VisionToolDemo.Wpf.Views
                     Value = Math.Max(def.Min, Math.Min(def.Max, cur)),
                     IsSnapToTickEnabled = true,
                     TickFrequency = 1,
-                    VerticalAlignment = VerticalAlignment.Center,
+                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
                 };
                 var num = new TextBox { Text = cur.ToString(CultureInfo.InvariantCulture), Margin = new Thickness(6, 0, 0, 0) };
                 slider.ValueChanged += (_, _) =>
@@ -1038,7 +1122,7 @@ namespace VisionToolDemo.Wpf.Views
                     _syncingParams = true;
                     num.Text = v.ToString(CultureInfo.InvariantCulture);
                     _syncingParams = false;
-                    SetParam(n, index, v, def, wrap);
+                    SetParam(n, index, v, def, valueLine);
                 };
                 num.TextChanged += (_, _) =>
                 {
@@ -1048,27 +1132,29 @@ namespace VisionToolDemo.Wpf.Views
                     _syncingParams = true;
                     slider.Value = v;
                     _syncingParams = false;
-                    SetParam(n, index, v, def, wrap);
+                    SetParam(n, index, v, def, valueLine);
                     num.Text = v.ToString(CultureInfo.InvariantCulture);
                 };
                 Grid.SetColumn(slider, 0);
                 Grid.SetColumn(num, 1);
                 row.Children.Add(slider);
                 row.Children.Add(num);
+                ctrlPanel.Children.Add(row);
             }
 
-            wrap.Children.Add(row);
-            InspHost.Children.Add(wrap);
+            rowGrid.Children.Add(namePanel);
+            rowGrid.Children.Add(ctrlPanel);
+            rowBorder.Child = rowGrid;
+            InspHost.Children.Add(rowBorder);
         }
 
-        private void SetParam(AutoNode n, int index, int value, TaskParamDesc def, StackPanel wrap)
+        private void SetParam(AutoNode n, int index, int value, TaskParamDesc def, TextBlock valueLine)
         {
             _graph.NormalizeParams();
             if (n.Params == null || index >= n.Params.Length) return;
             n.Params[index] = value;
-            // 第 2 行才是"当前值"，随拖动手柄/输入框实时更新（第 1 行是固定的取值图例）
-            if (wrap.Children.Count > 1 && wrap.Children[1] is TextBlock lb)
-                lb.Text = ParamDisplay.NameOf(def) + " = " + ParamDisplay.ValueText(def, value);
+            // 名称下方小字"当前值"随拖动手柄/输入框实时更新
+            valueLine.Text = ParamDisplay.NameOf(def) + " = " + ParamDisplay.ValueText(def, value);
             UpdateNodeVisual(n.Id);
         }
 
@@ -1112,12 +1198,13 @@ namespace VisionToolDemo.Wpf.Views
         private void AddTemplateRow(AutoNode n)
         {
             var t = _graph.GetNodeTemplate(n.Id);
-            InspHost.Children.Add(new TextBlock
+            var tplInfo = new TextBlock
             {
                 Text = t == null || t.Empty() ? "还没导入模板图" : string.Format("已导入 {0}x{1}", t.Cols, t.Rows),
-                Style = (Style)FindResource(t == null || t.Empty() ? "FaintText" : "DimText"),
                 Margin = new Thickness(0, 0, 0, 4),
-            });
+            };
+            Ui.Class(tplInfo, t == null || t.Empty() ? "fainttext" : "dimtext");
+            InspHost.Children.Add(tplInfo);
 
             if (t != null && !t.Empty())
             {
@@ -1128,7 +1215,7 @@ namespace VisionToolDemo.Wpf.Views
                     Stretch = Stretch.Uniform,
                     MaxWidth = 180,
                     MaxHeight = 120,
-                    HorizontalAlignment = HorizontalAlignment.Left,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
                 };
                 var thumbFrame2 = new Border
                 {
@@ -1136,29 +1223,25 @@ namespace VisionToolDemo.Wpf.Views
                     CornerRadius = new CornerRadius(6),
                     Padding = new Thickness(3),
                     Margin = new Thickness(0, 0, 0, 6),
-                    HorizontalAlignment = HorizontalAlignment.Left,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
                     Child = thumb,
-                    ToolTip = Ui.Tip("当前节点的模板图（按比例缩略）。"),
                 };
+                ToolTip.SetTip(thumbFrame2, Ui.Tip("当前节点的模板图（按比例缩略）。"));
                 thumbFrame2.Background = Ui.Brush("InputBg");
                 thumbFrame2.BorderBrush = Ui.Brush("Line");
                 InspHost.Children.Add(thumbFrame2);
             }
 
-            var row = new StackPanel { Orientation = Orientation.Horizontal };
+            var row = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal };
             var imp = new Button { Content = "导入模板图…", Classes = { "flat" } };
-            imp.Click += (_, _) =>
+            imp.Click += async (_, _) =>
             {
-                var dlg = new OpenFileDialog
-                {
-                    Title = "导入模板图（小图，从屏幕或图片上裁下来的目标）",
-                    Filter = "图片|*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff|所有文件|*.*",
-                };
-                if (dlg.ShowDialog() != true) return;
-                var mat = Cv2.ImRead(dlg.FileName, ImreadModes.Color);
+                var picked = await PickImageAsync("导入模板图（小图，从屏幕或图片上裁下来的目标）");
+                if (picked == null) return;
+                var mat = Cv2.ImRead(picked, ImreadModes.Color);
                 if (mat == null || mat.Empty())
                 {
-                    Error("这张图读不出来：" + dlg.FileName);
+                    Error("这张图读不出来：" + picked);
                     return;
                 }
                 _graph.SetNodeTemplate(n.Id, mat);
@@ -1184,16 +1267,12 @@ namespace VisionToolDemo.Wpf.Views
 
         private string EditLongText(string title, string current, string helpText = null)
         {
-            var win = new Window
+            var win = new EditLongTextWindow
             {
                 Title = "编辑 —— " + title,
                 Width = 700,
                 Height = 520,
-                Owner = Window.GetWindow(this),
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                // 深色弹窗必须显式给亮色前景：Window 默认前景是黑色，
-                // 某些控件在深色背景上会显示成黑字看不清（用户反馈"弹窗的字看不清"）
-                // 用 SetResourceReference 绑定，主题切换（含"冻结→替换键"路径）必跟随
             };
             win.Background = Ui.Brush("Bg");
             win.Foreground = Ui.Brush("Fg");
@@ -1212,8 +1291,8 @@ namespace VisionToolDemo.Wpf.Views
                     Classes = { "flat" },
                     Height = 28,
                     Padding = new Thickness(14, 4, 14, 4),
-                    ToolTip = Ui.Tip("点开看表达式怎么编写：变量、赋值、运算符、函数清单与示例"),
                 };
+                ToolTip.SetTip(helpBtn, Ui.Tip("点开看表达式怎么编写：变量、赋值、运算符、函数清单与示例"));
                 DockPanel.SetDock(helpBtn, Dock.Right);
                 head.Children.Add(helpBtn);
                 helpBtn.Click += (_, _) => ShowHelpWindow(title, helpText);
@@ -1227,26 +1306,30 @@ namespace VisionToolDemo.Wpf.Views
                 AcceptsReturn = true,
                 AcceptsTab = true,
                 TextWrapping = TextWrapping.NoWrap,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
                 FontFamily = Ui.Font("MonoFont"),
             };
             Grid.SetRow(box, 1);
             grid.Children.Add(box);
 
-            var bar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0) };
+            var bar = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0) };
             string result = null;
             var ok = new Button { Content = "确定", Classes = { "primary" }, Width = 90 };
             var cancel = new Button { Content = "取消", Classes = { "flat" }, Width = 90, Margin = new Thickness(8, 0, 0, 0) };
-            ok.Click += (_, _) => { result = box.Text; win.DialogResult = true; };
-            cancel.Click += (_, _) => { win.DialogResult = false; };
+            ok.Click += (_, _) => { result = box.Text; win.ModalResult = true; win.Close(); };
+            cancel.Click += (_, _) => { win.ModalResult = false; win.Close(); };
             bar.Children.Add(ok);
             bar.Children.Add(cancel);
             Grid.SetRow(bar, 2);
             grid.Children.Add(bar);
 
             win.Content = grid;
-            return win.ShowDialog() == true ? result : null;
+            return Ui.ShowModalResult(win) ? result : null;
+        }
+
+        /// <summary>长文本编辑弹窗（VisionMaster 风格：确定/取消 + 可选"表达式帮助"）</summary>
+        private sealed class EditLongTextWindow : Window, Ui.IModalResult
+        {
+            public bool ModalResult { get; set; }
         }
 
         /// <summary>
@@ -1292,7 +1375,6 @@ namespace VisionToolDemo.Wpf.Views
                 Title = "帮助 —— " + title,
                 Width = 640,
                 Height = 580,
-                Owner = Window.GetWindow(this),
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 ShowInTaskbar = false,
             };
@@ -1312,7 +1394,7 @@ namespace VisionToolDemo.Wpf.Views
                     panel.Children.Add(new TextBlock
                     {
                         Text = line.Substring(2),
-                        Style = (Style)FindResource("SectionHeader"),
+                        Classes = { "sectionheader" },
                         Margin = new Thickness(0, 6, 0, 6),
                     });
                 }
@@ -1347,12 +1429,12 @@ namespace VisionToolDemo.Wpf.Views
             }
             panel.Children.Add(new Border { Height = 6 });
 
-            var ok = new Button { Content = "关闭", Classes = { "primary" }, Width = 90, HorizontalAlignment = HorizontalAlignment.Right };
+            var ok = new Button { Content = "关闭", Classes = { "primary" }, Width = 90, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
             ok.Click += (_, _) => win.Close();
             panel.Children.Add(ok);
 
             win.Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = panel };
-            win.ShowDialog();
+            Ui.ShowModalResult(win);
         }
 
         private void UpdateNodeVisual(int id)
@@ -1412,7 +1494,7 @@ namespace VisionToolDemo.Wpf.Views
 
             SetStatus(dry ? "干跑中…（不会真的动鼠标键盘）" : "★真实执行中★ 把鼠标甩到屏幕角落可中止");
             // 让状态栏先画出来，再开始同步执行（运行器在 UI 线程跑）
-            Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+            Dispatcher.UIThread.Invoke(() => { }, DispatcherPriority.Render);
 
             var result = AutomationRunner.Run(_graph, stepLimit > 0 ? stepLimit : 2000, AppendLog);
             _result?.DisposeImages();
@@ -1438,19 +1520,17 @@ namespace VisionToolDemo.Wpf.Views
             // 合并成"每帧最多滚一次"，内容照常全部追加，界面不卡。
             if (_scrollPending) return;
             _scrollPending = true;
-            Dispatcher.BeginInvoke(() =>
+            Dispatcher.UIThread.Post(() =>
             {
-                LogBox.ScrollToEnd();
                 _scrollPending = false;
-            }, System.Windows.Threading.DispatcherPriority.Background);
+            });
         }
 
         private void UpdateStats(AutomationRunResult r)
         {
             string verdict = AutomationContext.FinalVerdict;
             Vm.StatVerdict = verdict.Length == 0 ? (r.Ok ? "未判定" : "中止") : verdict;
-            StatVerdict.SetResourceReference(TextBlock.ForegroundProperty,
-                verdict == "NG" || (!r.Ok) ? "Ng" : verdict == "OK" ? "Ok" : "FgDim");
+            StatVerdict.Foreground = Ui.Brush(verdict == "NG" || (!r.Ok) ? "Ng" : verdict == "OK" ? "Ok" : "FgDim");
             Vm.StatMs = r.TotalMs + " ms";
             Vm.StatSteps = string.Format("{0} / {1}", r.Steps, r.Actions);
             Vm.StatSkip = string.Format("{0} / {1}", r.SkippedActions, r.Ok ? 0 : 1);
@@ -1488,7 +1568,7 @@ namespace VisionToolDemo.Wpf.Views
                 : string.Format("{0}  {1}x{2}", what, src.Cols, src.Rows);
         }
 
-        private void IssueList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        private void IssueList_MouseDoubleClick(object sender, TappedEventArgs e)
         {
             if (IssueList.SelectedItem == null) return;
             var prop = IssueList.SelectedItem.GetType().GetProperty("NodeId");
@@ -1533,7 +1613,7 @@ namespace VisionToolDemo.Wpf.Views
             catch (Exception ex) { Error(ex.Message); }
         }
 
-        private void RecordList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        private void RecordList_MouseDoubleClick(object sender, TappedEventArgs e)
         {
             if (RecordList.SelectedItem == null) return;
             var prop = RecordList.SelectedItem.GetType().GetProperty("Dir");
@@ -1609,7 +1689,7 @@ namespace VisionToolDemo.Wpf.Views
                 Title = "节点图 JSON（可复制/保存，就是保存到文件的同一份）",
                 Width = 760,
                 Height = 620,
-                Owner = Window.GetWindow(this),
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
             };
             win.Background = Ui.Brush("Bg");
             win.Foreground = Ui.Brush("Fg");
@@ -1622,14 +1702,12 @@ namespace VisionToolDemo.Wpf.Views
                 IsReadOnly = true,
                 AcceptsReturn = true,
                 TextWrapping = TextWrapping.NoWrap,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
                 FontFamily = Ui.Font("MonoFont"),
             };
             grid.Children.Add(box);
-            var bar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0) };
+            var bar = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0) };
             var copy = new Button { Content = "复制", Classes = { "flat" }, Width = 90 };
-            copy.Click += (_, _) => { try { Clipboard.SetText(json); SetStatus("JSON 已复制到剪贴板"); } catch { } };
+            copy.Click += (_, _) => { try { Ui.CopyToClipboard(json); SetStatus("JSON 已复制到剪贴板"); } catch { } };
             var close = new Button { Content = "关闭", Classes = { "primary" }, Width = 90, Margin = new Thickness(8, 0, 0, 0) };
             close.Click += (_, _) => win.Close();
             bar.Children.Add(copy);
@@ -1637,35 +1715,26 @@ namespace VisionToolDemo.Wpf.Views
             Grid.SetRow(bar, 1);
             grid.Children.Add(bar);
             win.Content = grid;
-            win.ShowDialog();
+            Ui.ShowModalResult(win);
         }
 
         /// <summary>导出节点图 JSON（与旧版编辑器格式一致，保证与已有 .autograph.json 互通）</summary>
         private string ExportJson()
             => AutomationGraphIO.Export(_graph);
 
-        private void SaveGraphFile()
+        private async void SaveGraphFile()
         {
-            var dlg = new SaveFileDialog
-            {
-                Title = "保存节点图",
-                Filter = "节点图 (*.autograph.json)|*.autograph.json|JSON|*.json",
-                FileName = "工作流.autograph.json",
-            };
-            if (dlg.ShowDialog() != true) return;
-            System.IO.File.WriteAllText(dlg.FileName, ExportJson());
-            SetStatus("已保存：" + dlg.FileName);
+            var picked = await PickSaveGraphAsync();
+            if (picked == null) return;
+            System.IO.File.WriteAllText(picked, ExportJson());
+            SetStatus("已保存：" + picked);
         }
 
-        private void LoadGraphFile()
+        private async void LoadGraphFile()
         {
-            var dlg = new OpenFileDialog
-            {
-                Title = "加载节点图",
-                Filter = "节点图 (*.autograph.json)|*.autograph.json|JSON|*.json|所有文件|*.*",
-            };
-            if (dlg.ShowDialog() != true) return;
-            LoadGraphFrom(dlg.FileName);
+            var picked = await PickOpenGraphAsync();
+            if (picked == null) return;
+            LoadGraphFrom(picked);
         }
 
         private void LoadGraphFrom(string path)
@@ -1682,6 +1751,66 @@ namespace VisionToolDemo.Wpf.Views
             catch (Exception ex) { Error("加载失败：" + ex.Message); }
         }
 
+
+        // ================================================================ StorageProvider 文件对话框助手
+
+        /// <summary>选择一张图片（返回本地路径；取消返回 null）</summary>
+        private async Task<string> PickImageAsync(string title)
+        {
+            var top = TopLevel.GetTopLevel(this);
+            if (top?.StorageProvider == null) return null;
+            var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = title,
+                AllowMultiple = false,
+                FileTypeFilter = new[]
+                {
+                    new FilePickerFileType("图片") { Patterns = new[] { "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tif", "*.tiff" } },
+                    new FilePickerFileType("所有文件") { Patterns = new[] { "*.*" } },
+                },
+            });
+            var f = files.FirstOrDefault();
+            return f?.TryGetLocalPath();
+        }
+
+        /// <summary>打开节点图文件（.autograph.json）</summary>
+        private async Task<string> PickOpenGraphAsync()
+        {
+            var top = TopLevel.GetTopLevel(this);
+            if (top?.StorageProvider == null) return null;
+            var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "加载节点图",
+                AllowMultiple = false,
+                FileTypeFilter = new[]
+                {
+                    new FilePickerFileType("节点图") { Patterns = new[] { "*.autograph.json", "*.json" } },
+                    new FilePickerFileType("所有文件") { Patterns = new[] { "*.*" } },
+                },
+            });
+            var f = files.FirstOrDefault();
+            return f?.TryGetLocalPath();
+        }
+
+        /// <summary>保存节点图文件（.autograph.json）</summary>
+        private async Task<string> PickSaveGraphAsync()
+        {
+            var top = TopLevel.GetTopLevel(this);
+            if (top?.StorageProvider == null) return null;
+            var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "保存节点图",
+                SuggestedFileName = "工作流.autograph.json",
+                DefaultExtension = "autograph.json",
+                FileTypeChoices = new[]
+                {
+                    new FilePickerFileType("节点图") { Patterns = new[] { "*.autograph.json" } },
+                    new FilePickerFileType("JSON") { Patterns = new[] { "*.json" } },
+                },
+            });
+            return file?.TryGetLocalPath();
+        }
+
         /// <summary>「示例」菜单：内置几个可直接载入的流程样本，免手搭节点图。</summary>
         private void SampleMenu()
         {
@@ -1690,7 +1819,6 @@ namespace VisionToolDemo.Wpf.Views
                 Title = "内置流程示例",
                 Width = 480,
                 Height = 380,
-                Owner = Window.GetWindow(this),
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
             };
             win.Background = Ui.Brush("Bg");
@@ -1710,15 +1838,15 @@ namespace VisionToolDemo.Wpf.Views
             {
                 var card = new Border
                 {
-                    Style = (Style)FindResource("Card"),
+                    Classes = { "card" },
                     Margin = new Thickness(0, 0, 0, 8),
                 };
                 var sp = new StackPanel { Margin = new Thickness(10) };
-                sp.Children.Add(new TextBlock { Text = sample.Title, Style = (Style)FindResource("CardTitle") });
+                sp.Children.Add(new TextBlock { Text = sample.Title, Classes = { "cardtitle" } });
                 sp.Children.Add(new TextBlock
                 {
                     Text = sample.Note,
-                    Style = (Style)FindResource("CardSub"),
+                    Classes = { "cardsub" },
                     TextWrapping = TextWrapping.Wrap,
                     Margin = new Thickness(0, 2, 0, 0),
                 });
@@ -1726,7 +1854,7 @@ namespace VisionToolDemo.Wpf.Views
                 {
                     Content = "载入此示例",
                     Classes = { "flat" },
-                    HorizontalAlignment = HorizontalAlignment.Right,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
                     Margin = new Thickness(0, 6, 0, 0),
                 };
                 string json = sample.Json;
@@ -1738,7 +1866,7 @@ namespace VisionToolDemo.Wpf.Views
             listHost.Content = listPanel;
             panel.Children.Add(listHost);
             win.Content = panel;
-            win.ShowDialog();
+            Ui.ShowModalResult(win);
         }
 
         /// <summary>把一段节点图 JSON 载入画布（内置示例 / 粘贴的 JSON 共用）</summary>
@@ -1763,7 +1891,6 @@ namespace VisionToolDemo.Wpf.Views
                 Title = "配方（参数预设）",
                 Width = 420,
                 Height = 260,
-                Owner = Window.GetWindow(this),
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
             };
             win.Background = Ui.Brush("Bg");
@@ -1783,18 +1910,13 @@ namespace VisionToolDemo.Wpf.Views
             panel.Children.Add(save);
             panel.Children.Add(load);
             win.Content = panel;
-            win.ShowDialog();
+            Ui.ShowModalResult(win);
         }
 
-        private void SaveRecipe()
+        private async void SaveRecipe()
         {
-            var dlg = new SaveFileDialog
-            {
-                Title = "保存配方",
-                Filter = "配方 (*.recipe.json)|*.recipe.json|JSON|*.json",
-                FileName = "配方.recipe.json",
-            };
-            if (dlg.ShowDialog() != true) return;
+            var picked = await PickSaveRecipeAsync();
+            if (picked == null) return;
             var data = new Dictionary<string, object>();
             foreach (var n in _graph.Nodes)
             {
@@ -1809,20 +1931,60 @@ namespace VisionToolDemo.Wpf.Views
                     s3 = _graph.GetNodeString(n.Id, 3),
                 };
             }
-            System.IO.File.WriteAllText(dlg.FileName,
+            System.IO.File.WriteAllText(picked,
                 Newtonsoft.Json.JsonConvert.SerializeObject(data, Newtonsoft.Json.Formatting.Indented));
-            SetStatus("配方已保存：" + dlg.FileName);
+            SetStatus("配方已保存：" + picked);
         }
 
-        private void ApplyRecipe()
+
+        /// <summary>保存配方文件（.recipe.json）</summary>
+        private async Task<string> PickSaveRecipeAsync()
         {
-            var dlg = new OpenFileDialog { Title = "套用配方", Filter = "配方 (*.recipe.json)|*.recipe.json|JSON|*.json|所有文件|*.*" };
-            if (dlg.ShowDialog() != true) return;
+            var top = TopLevel.GetTopLevel(this);
+            if (top?.StorageProvider == null) return null;
+            var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "保存配方",
+                SuggestedFileName = "配方.recipe.json",
+                DefaultExtension = "recipe.json",
+                FileTypeChoices = new[]
+                {
+                    new FilePickerFileType("配方") { Patterns = new[] { "*.recipe.json" } },
+                    new FilePickerFileType("JSON") { Patterns = new[] { "*.json" } },
+                },
+            });
+            return file?.TryGetLocalPath();
+        }
+
+        /// <summary>打开配方文件（.recipe.json）</summary>
+        private async Task<string> PickOpenRecipeAsync()
+        {
+            var top = TopLevel.GetTopLevel(this);
+            if (top?.StorageProvider == null) return null;
+            var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "套用配方",
+                AllowMultiple = false,
+                FileTypeFilter = new[]
+                {
+                    new FilePickerFileType("配方") { Patterns = new[] { "*.recipe.json", "*.json" } },
+                    new FilePickerFileType("所有文件") { Patterns = new[] { "*.*" } },
+                },
+            });
+            var f = files.FirstOrDefault();
+            return f?.TryGetLocalPath();
+        }
+
+        
+        private async void ApplyRecipe()
+        {
+            var picked = await PickOpenRecipeAsync();
+            if (picked == null) return;
             try
             {
                 var data = Newtonsoft.Json.JsonConvert
                     .DeserializeObject<Dictionary<string, Newtonsoft.Json.Linq.JObject>>(
-                        System.IO.File.ReadAllText(dlg.FileName));
+                        System.IO.File.ReadAllText(picked));
                 int applied = 0;
                 foreach (var kv in data)
                 {
@@ -1854,7 +2016,7 @@ namespace VisionToolDemo.Wpf.Views
             Ui.Notice(message, "出错了", true);
         }
         /// <summary>顶栏主题色点点击：应用主题并刷新本页色点（全软件风格统一）</summary>
-        private void ThemeDot_Click(object sender, MouseButtonEventArgs e)
+        private void ThemeDot_Click(object sender, PointerPressedEventArgs e)
         {
             ThemeUi.ApplyFromClick(sender as Border, ThemeDot0, ThemeDot1, ThemeDot2, ThemeDot3, ThemeDot4);
         }

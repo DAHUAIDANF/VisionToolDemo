@@ -1,8 +1,9 @@
 using System;
 using System.Globalization;
 using System.IO;
-using System.Windows;
-using System.Windows.Controls;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Layout;
 using VisionToolDemo.Vision;
 
 namespace VisionToolDemo.Wpf
@@ -11,9 +12,10 @@ namespace VisionToolDemo.Wpf
     /// 视频抽帧参数框（WPF 版，等价旧界面的 VideoOpenDialog）：
     /// 选起始时间、抽帧间隔、最多帧数；间隔填 0 = 只取一帧。
     /// </summary>
-    public sealed class VideoImportWindow : Window
+    public sealed class VideoImportWindow : Window, Ui.IModalResult
     {
         public double StartSeconds { get; private set; }
+        public bool ModalResult { get; private set; }
         public double IntervalSeconds { get; private set; }
         public int MaxFrames { get; private set; } = 50;
 
@@ -26,7 +28,7 @@ namespace VisionToolDemo.Wpf
             Title = "视频导入 — " + Path.GetFileName(path);
             Width = 560;
             SizeToContent = SizeToContent.Height;
-            ResizeMode = ResizeMode.NoResize;
+            CanResize = false;
 
             var info = VideoImporter.Probe(path);
             _start = Ui.Input("0");
@@ -49,7 +51,7 @@ namespace VisionToolDemo.Wpf
 
             var one = Ui.Btn("只取一帧", () => { _interval.Text = "0"; _max.Text = "1"; });
             var ok = Ui.Btn("开始抽帧", Confirm, true);
-            var cancel = Ui.Btn("取消", () => { DialogResult = false; });
+            var cancel = Ui.Btn("取消", () => { ModalResult = false; Close(); });
             var bar = Ui.Bar(one, ok, cancel);
 
             panel.Children.Add(bar);
@@ -69,7 +71,7 @@ namespace VisionToolDemo.Wpf
             StartSeconds = s;
             IntervalSeconds = itv;
             MaxFrames = Math.Min(100000, max);
-            DialogResult = true;
+            ModalResult = true; Close();
         }
     }
 }

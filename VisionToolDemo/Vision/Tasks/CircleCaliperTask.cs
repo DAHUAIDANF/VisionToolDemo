@@ -100,6 +100,12 @@ namespace VisionToolDemo.Vision.Tasks
                 return new Mat();
             int edgeThresh = paramValues[0];
             int bandHalf = Math.Max(1, paramValues[1] / 2);
+            // 角度范围 + 极性（老链 Values 可能没有这些参数，缺省=整圆+任意）
+            int startDeg = paramValues.Length > 2 ? paramValues[2] : 0;
+            int endDeg = paramValues.Length > 3 ? paramValues[3] : 360;
+            int polar = paramValues.Length > 4 ? paramValues[4] : 0;
+            if (endDeg < startDeg || endDeg - startDeg >= 360) endDeg = startDeg + 360;
+            bool fullCircle = (endDeg - startDeg) >= 360;
 
             Mat dst = VisionHelper.ToBgrCopy(srcMat);
             FitOk = false;
@@ -112,9 +118,11 @@ namespace VisionToolDemo.Vision.Tasks
             double cx = Center.X;
             double cy = Center.Y;
 
-            // 扫描方向数：弧长步长 1 像素（上限 1000），径向在 [r-bandHalf, r+bandHalf] 搜索边缘
-            int rayCount = Math.Min((int)(2 * Math.PI * Radius), 1000);
-            if (rayCount < 8)
+            // 扫描方向数：弧长步长 1 像素（上限 1000），径向在 [r-bandHalf, r+bandHalf] 搜索边缘。
+            // VisionMaster 风格：角度范围（起始角→终止角）限定扫描圆弧段。
+            double sweepRad = (endDeg - startDeg) * Math.PI / 180.0;
+            int rayCount = Math.Min((int)(sweepRad * Radius), 1000);
+            if (rayCount < 5)
                 return dst;
 
             int rMin = Math.Max(1, Radius - bandHalf);
@@ -127,7 +135,7 @@ namespace VisionToolDemo.Vision.Tasks
             {
                 for (int i = 0; i < rayCount; i++)
                 {
-                    double ang = 2 * Math.PI * i / rayCount;
+                    double ang = startDeg * Math.PI / 180.0 + (sweepRad * i / Math.Max(1, rayCount - (fullCircle ? 1 : 0)));
                     double cosT = Math.Cos(ang), sinT = Math.Sin(ang);
                     double tX = -sinT, tY = cosT; // 切向（垂直于径向扫描方向）
 
@@ -146,20 +154,21 @@ namespace VisionToolDemo.Vision.Tasks
                         profile[j] = sum / 3;
                     }
 
-                    // 径向一阶差分，找该方向最强的上升/下降沿
+                    // 径向一阶差分，找该方向最强的上升/下降沿（按极性过滤）
                     int bestRise = -1, bestFall = -1;
                     double maxGrad = 0, minGrad = 0;
                     for (int j = 1; j < radialCount; j++)
                     {
                         double g = profile[j] - profile[j - 1];
+                        if (polar == 2 && g <= 0) continue;   // 只要暗到亮：忽略下降
+                        if (polar == 1 && g >= 0) continue;   // 只要亮到暗：忽略上升
                         if (g > maxGrad) { maxGrad = g; bestRise = j; }
                         if (g < minGrad) { minGrad = g; bestFall = j; }
                     }
-                    if (bestRise < 0)
-                        continue; // 整条径向线都在图外
+                    if (bestRise < 0 && bestFall < 0)
+                        continue; // 整条径向线都在图外（只找一种极性时，另一种没有不算越界）
 
-                    // 取该方向上最强的沿（升/降中绝对值大者），超阈值才记录
-                    bool isRise = maxGrad >= -minGrad;
+                    bool isRise = polar == 2 || (polar == 0 && maxGrad >= -minGrad);
                     int jBest = isRise ? bestRise : bestFall;
                     double gPeak = isRise ? maxGrad : minGrad;
                     if (Math.Abs(gPeak) < edgeThresh)

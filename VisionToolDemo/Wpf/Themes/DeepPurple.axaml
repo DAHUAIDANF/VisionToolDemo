@@ -1,0 +1,22 @@
+<!-- 主题：深紫罗兰（夜间护眼） -->
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="Bg" Color="#1C1926" />
+    <SolidColorBrush x:Key="PanelBg" Color="#221F30" />
+    <SolidColorBrush x:Key="CardBg" Color="#38324D" />
+    <SolidColorBrush x:Key="CardBgHover" Color="#423B5A" />
+    <SolidColorBrush x:Key="NavBg" Color="#141119" />
+    <SolidColorBrush x:Key="Line" Color="#4F4663" />
+    <SolidColorBrush x:Key="Fg" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="FgDim" Color="#E6E6E6" />
+    <SolidColorBrush x:Key="FgFaint" Color="#C0C0C0" />
+    <SolidColorBrush x:Key="Accent" Color="#9B7BF5" />
+    <SolidColorBrush x:Key="AccentDim" Color="#2C2445" />
+    <SolidColorBrush x:Key="Ok" Color="#45DEA8" />
+    <SolidColorBrush x:Key="Warn" Color="#FFC94A" />
+    <SolidColorBrush x:Key="Ng" Color="#FF8A8A" />
+    <SolidColorBrush x:Key="InputBg" Color="#110F1A" />
+    <SolidColorBrush x:Key="SelBg" Color="#4A3F6B" />
+    <SolidColorBrush x:Key="CardSubFg" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF" />
+</ResourceDictionary>

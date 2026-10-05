@@ -29,7 +29,7 @@ namespace VisionToolDemo.Vision.Tasks
             {
                 ParamName = "块大小",
                 Min = 3,
-                Max = 21,
+                Max = 11,
                 DefaultValue = 9,
                 DisplayFormat = "块:{0}",
                 ForceOdd = true,
@@ -52,8 +52,18 @@ namespace VisionToolDemo.Vision.Tasks
             if (srcMat == null || srcMat.Empty())
                 return new Mat();
             int numDisp = Math.Max(16, (paramValues[0] / 16) * 16);   // 16 的倍数
-            int block = Math.Max(3, paramValues[1] | 1);              // 奇数
+            int block = Math.Max(3, Math.Min(11, paramValues[1] | 1)); // 奇数，OpenCV 允许 3..11
             int minDisp = paramValues[2];
+            // 尺寸护栏：视差搜索需要的宽度开销（numDisp + 块大小 + 边距）。
+            // 输入太窄时 SGBM 在原生层行为未定义（窄图在部分 runtime 直接段错误），
+            // 这里先给一句人话并返回原图，而不是让原生层崩。
+            int minWidth = numDisp + block + 64;
+            if (srcMat.Cols < minWidth)
+            {
+                LastSummary = string.Format("立体匹配: 失败 —— 图宽 {0}px 小于视差搜索所需 {1}px（可减小“视差范围”或换更宽的输入）",
+                    srcMat.Cols, minWidth);
+                return srcMat.Clone();
+            }
 
             // 拆左右：约定输入为左右拼接图（等宽两半）
             int half = srcMat.Cols / 2;

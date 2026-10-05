@@ -1,0 +1,22 @@
+<!-- 主题：深墨绿（工业仪表风格） -->
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="Bg" Color="#16201B" />
+    <SolidColorBrush x:Key="PanelBg" Color="#1B2720" />
+    <SolidColorBrush x:Key="CardBg" Color="#2C3A31" />
+    <SolidColorBrush x:Key="CardBgHover" Color="#36463B" />
+    <SolidColorBrush x:Key="NavBg" Color="#101913" />
+    <SolidColorBrush x:Key="Line" Color="#3F5246" />
+    <SolidColorBrush x:Key="Fg" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="FgDim" Color="#E6E6E6" />
+    <SolidColorBrush x:Key="FgFaint" Color="#C0C0C0" />
+    <SolidColorBrush x:Key="Accent" Color="#3FBF7F" />
+    <SolidColorBrush x:Key="AccentDim" Color="#1B3327" />
+    <SolidColorBrush x:Key="Ok" Color="#45DEA8" />
+    <SolidColorBrush x:Key="Warn" Color="#FFC94A" />
+    <SolidColorBrush x:Key="Ng" Color="#FF8A8A" />
+    <SolidColorBrush x:Key="InputBg" Color="#0E1712" />
+    <SolidColorBrush x:Key="SelBg" Color="#33503F" />
+    <SolidColorBrush x:Key="CardSubFg" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF" />
+</ResourceDictionary>

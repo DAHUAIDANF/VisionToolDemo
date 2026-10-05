@@ -1,0 +1,318 @@
+<!-- Avalonia 全局样式（由 WPF Styles.xaml 迁移）。
+     颜色资源不在此定义——5 套主题颜色在 Wpf/Themes/*.axaml，
+     由 ThemeManager 挂到 Application 级 MergedDictionaries 并动态切换；
+     本文件所有颜色引用一律 {DynamicResource Key}，切换主题自动跟随。
+     字体族资源在 App.axaml 的 Application.Resources（{StaticResource UiFont} 引用）。
+
+     【Avalonia 11 样式体系说明】
+     1. 根元素必须为 <Styles>（含 Style 元素的文件不能是 ResourceDictionary）。
+     2. 无 Style="引用" 与 TargetType 属性：样式一律用 Selector（class 选择器）。
+        控件挂样式 = 写 Classes="xxx"（多个 class 空格分隔）。
+     3. ControlTemplate 内不能嵌 <ControlTemplate.Styles>：模板 hover/checked 等
+        状态样式写成模板外层的 /template/ 选择器样式。
+     4. 先定义基础样式、后定义覆盖样式；同一 class 组合下后者覆盖前者。 -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ================= 文本（Classes：dimtext/fainttext/monotext/cardtitle/cardsub/pageheader/sectionheader） ================= -->
+    <Style Selector="TextBlock.dimtext">
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="Foreground" Value="{DynamicResource FgDim}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style Selector="TextBlock.fainttext">
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource FgFaint}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style Selector="TextBlock.monotext">
+        <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+    </Style>
+
+    <Style Selector="TextBlock.cardtitle">
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="13.5" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style Selector="TextBlock.cardsub">
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="Foreground" Value="{DynamicResource CardSubFg}" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Setter Property="Margin" Value="0,3,0,0" />
+    </Style>
+
+    <Style Selector="TextBlock.pageheader">
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="17" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+    </Style>
+
+    <Style Selector="TextBlock.sectionheader">
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="13.5" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+        <Setter Property="Margin" Value="0,2,0,6" />
+    </Style>
+
+    <!-- ================= 按钮（Classes：flat 普通 / primary 主按钮，可组合 "flat primary"） ================= -->
+    <Style Selector="Button.flat">
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+        <Setter Property="Background" Value="{DynamicResource CardBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="12,6" />
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <!-- hover / pressed / disabled（模板元素走 /template/ 选择器） -->
+    <Style Selector="Button.flat:pointerover">
+        <Setter Property="Background" Value="{DynamicResource CardBgHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    </Style>
+    <Style Selector="Button.flat:pressed">
+        <Setter Property="Background" Value="{DynamicResource AccentDim}" />
+    </Style>
+    <Style Selector="Button.flat:disabled">
+        <Setter Property="Opacity" Value="0.45" />
+    </Style>
+
+    <!-- 主按钮：在 flat 基础上覆盖底色（放 flat 之后定义，覆盖生效） -->
+    <Style Selector="Button.primary">
+        <Setter Property="Background" Value="{DynamicResource Accent}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.primary:pointerover">
+        <Setter Property="Background" Value="{DynamicResource Accent}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    </Style>
+
+    <!-- 开关按钮（ToggleButton）class=toggle：外观与 flat 一致，IsChecked 时 Accent 高亮 -->
+    <Style Selector="ToggleButton.toggle">
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+        <Setter Property="Background" Value="{DynamicResource CardBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="12,6" />
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="ToggleButton.toggle:pointerover">
+        <Setter Property="Background" Value="{DynamicResource CardBgHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    </Style>
+    <Style Selector="ToggleButton.toggle:pressed">
+        <Setter Property="Background" Value="{DynamicResource AccentDim}" />
+    </Style>
+    <Style Selector="ToggleButton.toggle:checked">
+        <Setter Property="Background" Value="{DynamicResource AccentDim}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="ToggleButton.toggle:disabled">
+        <Setter Property="Opacity" Value="0.45" />
+    </Style>
+
+    <!-- 窗口系统按钮（最小化/最大化/关闭）class=winbutton；关闭按钮再加 class=close，hover 红底 -->
+    <Style Selector="Button.winbutton">
+        <Setter Property="Width" Value="40" />
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="1,0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.winbutton:pointerover">
+        <Setter Property="Background" Value="{DynamicResource CardBgHover}" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+    </Style>
+    <Style Selector="Button.winbutton.close:pointerover">
+        <Setter Property="Background" Value="#C42B1C" />
+        <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.winbutton:disabled">
+        <Setter Property="Opacity" Value="0.4" />
+    </Style>
+
+    <!-- 分类筛选胶囊（节点库/算子库分类按钮）class=chip -->
+    <Style Selector="ToggleButton.chip">
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource FgDim}" />
+        <Setter Property="Background" Value="{DynamicResource CardBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="9,4" />
+        <Setter Property="Margin" Value="0,0,5,5" />
+        <Setter Property="CornerRadius" Value="11" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="ToggleButton.chip:pointerover">
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+    </Style>
+    <Style Selector="ToggleButton.chip:checked">
+        <Setter Property="Background" Value="{DynamicResource Accent}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- ================= 标准输入控件（Fluent 默认模板 + 主题色覆盖） ================= -->
+    <Style Selector="TextBox">
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+        <Setter Property="Background" Value="{DynamicResource InputBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="CaretBrush" Value="{DynamicResource Fg}" />
+        <Setter Property="SelectionBrush" Value="{DynamicResource Accent}" />
+    </Style>
+
+    <Style Selector="ComboBox">
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+        <Setter Property="Background" Value="{DynamicResource InputBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="MinWidth" Value="90" />
+    </Style>
+
+    <Style Selector="CheckBox">
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="Slider">
+        <Setter Property="MinHeight" Value="24" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="ProgressBar">
+        <Setter Property="Height" Value="14" />
+        <Setter Property="Background" Value="{DynamicResource InputBg}" />
+        <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+    </Style>
+
+    <Style Selector="ToolTip">
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+        <Setter Property="Background" Value="{DynamicResource CardBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="MaxWidth" Value="480" />
+    </Style>
+
+    <Style Selector="ScrollViewer">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <Style Selector="GridSplitter">
+        <Setter Property="Background" Value="{DynamicResource Line}" />
+    </Style>
+
+    <!-- ================= 容器（Classes：card / panel / steppill / statcell） ================= -->
+    <Style Selector="Border.card">
+        <Setter Property="Background" Value="{DynamicResource CardBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="10" />
+    </Style>
+
+    <Style Selector="Border.panel">
+        <Setter Property="Background" Value="{DynamicResource PanelBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+    <Style Selector="Border.steppill">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="10,3" />
+    </Style>
+
+    <Style Selector="Border.statcell">
+        <Setter Property="Background" Value="{DynamicResource InputBg}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="8,6" />
+    </Style>
+
+    <Style Selector="TextBlock.steptext">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource FgDim}" />
+    </Style>
+
+    <!-- ================= 列表 ================= -->
+    <Style Selector="ListBox">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+    </Style>
+
+    <Style Selector="ListBoxItem">
+        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+        <Setter Property="Padding" Value="4" />
+    </Style>
+
+    <!-- 卡片式列表项：标题+副标题一行，选中/悬浮高亮（class=carditem） -->
+    <Style Selector="ListBoxItem.carditem">
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0,0,0,7" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+    </Style>
+    <Style Selector="ListBoxItem.carditem:pointerover">
+        <Setter Property="Background" Value="{DynamicResource CardBgHover}" />
+    </Style>
+    <Style Selector="ListBoxItem.carditem:selected">
+        <Setter Property="Background" Value="{DynamicResource SelBg}" />
+    </Style>
+
+    <Style Selector="TabControl">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+    <Style Selector="TabItem">
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="Foreground" Value="{DynamicResource FgDim}" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+</Styles>

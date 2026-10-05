@@ -1,8 +1,10 @@
 using System;
 using System.Globalization;
 using System.IO;
-using System.Windows;
-using System.Windows.Controls;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Controls.Primitives;
 using VisionToolDemo.Vision;
 
 namespace VisionToolDemo.Wpf
@@ -15,9 +17,10 @@ namespace VisionToolDemo.Wpf
     /// 同一份 16 位数据按 8 位读，std 从 44 变成 82）。
     /// 所以这里带上「按文件大小自动推断位深」和"期望字节数 vs 实际文件大小"的对照。
     /// </summary>
-    public sealed class RawParamsWindow : Window
+    public sealed class RawParamsWindow : Window, Ui.IModalResult
     {
         public RawImageParams Result { get; private set; }
+        public bool ModalResult { get; private set; }
 
         private readonly string _path;
         private readonly TextBox _w, _h, _offset, _fullScale;
@@ -34,7 +37,7 @@ namespace VisionToolDemo.Wpf
             Title = "裸 RAW 参数 — " + Path.GetFileName(filePath);
             Width = 520;
             SizeToContent = SizeToContent.Height;
-            ResizeMode = ResizeMode.NoResize;
+            CanResize = false;
 
             _w = Ui.Input(d.Width.ToString(CultureInfo.InvariantCulture));
             _h = Ui.Input(d.Height.ToString(CultureInfo.InvariantCulture));
@@ -62,10 +65,10 @@ namespace VisionToolDemo.Wpf
 
             var auto = Ui.Btn("按文件大小自动推断位深", AutoDetect);
             var ok = Ui.Btn("确定", Confirm, true);
-            var cancel = Ui.Btn("取消", () => { DialogResult = false; });
+            var cancel = Ui.Btn("取消", () => { ModalResult = false; Close(); });
 
             var bar = Ui.Bar(auto, ok, cancel);
-            bar.HorizontalAlignment = HorizontalAlignment.Left;
+            bar.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
             panel.Children.Add(bar);
             panel.Children.Add(Ui.Card(_info));
             Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = panel };
@@ -141,7 +144,7 @@ namespace VisionToolDemo.Wpf
             if (p.Width <= 0 || p.Height <= 0) { Ui.Warn("宽度和高度必须大于 0"); return; }
             if (p.Offset < 0) { Ui.Warn("偏移不能是负数"); return; }
             Result = p;
-            DialogResult = true;
+            ModalResult = true; Close();
         }
     }
 }

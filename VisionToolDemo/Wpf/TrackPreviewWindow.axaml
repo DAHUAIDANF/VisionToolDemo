@@ -1,0 +1,37 @@
+﻿<Window x:Class="VisionToolDemo.Wpf.TrackPreviewWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="实时目标跟踪（视频 / 摄像头）" Width="960" Height="640"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource Bg}">
+    
+    <DockPanel>
+        <!-- 顶部工具条：包横向滚动，窗口拉窄时右侧状态文本不被裁掉 -->
+        <ScrollViewer DockPanel.Dock="Top" VerticalScrollBarVisibility="Disabled" HorizontalScrollBarVisibility="Auto" Focusable="False">
+        <StackPanel Orientation="Horizontal" Margin="10,10,10,8">
+            <Button x:Name="BtnOpenVideo" Content="打开视频…" Classes="flat primary" Command="{Binding OpenVideoCommand}" />
+            <Button x:Name="BtnOpenCam" Content="打开摄像头…" Classes="flat" Margin="8,0,0,0" Command="{Binding OpenCamCommand}" />
+            <Button x:Name="BtnPlayPause" Content="{Binding PlayPauseText}" Classes="flat" Margin="8,0,0,0" IsEnabled="{Binding IsSourceOpen}" Command="{Binding PlayPauseCommand}" />
+            <ComboBox x:Name="TrackerTypeBox" Width="110" Margin="16,0,0,0" VerticalAlignment="Center"
+                      SelectedIndex="0" ToolTip.Tip="追踪器类型（换类型需重新框选目标）">
+                <ComboBoxItem Content="KCF 追踪器" />
+                <ComboBoxItem Content="CSRT 追踪器" />
+                <ComboBoxItem Content="MIL 追踪器" />
+            </ComboBox>
+            <Button x:Name="BtnReset" Content="重置跟踪" Classes="flat" Margin="8,0,0,0" IsEnabled="{Binding IsSourceOpen}" Command="{Binding ResetCommand}" />
+            <CheckBox x:Name="MirrorBox" Content="镜像画面" Foreground="{DynamicResource FgDim}" VerticalAlignment="Center"
+                      Margin="14,0,0,0" IsChecked="{Binding IsMirrored}" ToolTip.Tip="摄像头画面左右镜像（USB 摄像头多为镜像输出）；视频文件默认关闭" />
+            <TextBlock x:Name="StatusText" Foreground="{DynamicResource FgDim}" VerticalAlignment="Center" Margin="18,0,0,0" Text="{Binding StatusText}" />
+        </StackPanel>
+        </ScrollViewer>
+
+        <!-- 画面：Image + Canvas 叠加框选/目标框（背景跟随主题） -->
+        <Grid Margin="10,0,10,10" ClipToBounds="True" Background="{DynamicResource InputBg}">
+            <Image x:Name="FrameImage" Stretch="Uniform" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                   PointerPressed="Frame_MouseDown" PointerMoved="Frame_MouseMove" PointerReleased="Frame_MouseUp" />
+            <Canvas x:Name="OverlayCanvas" IsHitTestVisible="False" />
+        </Grid>
+
+        <TextBlock DockPanel.Dock="Bottom" Margin="10,0,10,8" Foreground="{DynamicResource FgDim}" TextWrapping="Wrap"
+                   Text="用法：打开视频/摄像头 → 暂停后在画面上按住左键拖一个框框住目标（松开即开始跟踪）→ 恢复播放逐帧跟踪。目标丢失时画红框提示。" />
+    </DockPanel>
+</Window>

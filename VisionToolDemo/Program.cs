@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+using Avalonia;
 using VisionToolDemo.Vision.Automation;
 
 namespace VisionToolDemo
@@ -15,7 +17,7 @@ namespace VisionToolDemo
         /// 应用程序的主入口点。
         ///
         /// 两种运行方式：
-        ///   1) 默认：WPF 界面（矢量渲染 + 自动布局，按分辨率/DPI 自适应）；
+        ///   1) 默认：Avalonia 界面（跨平台，Windows/Linux 同一套 UI）；
         ///   2) --run 节点图.autograph.json：**无界面**跑一轮（无人值守/回归用），
         ///      默认干跑（不动鼠标键盘），要真操作必须显式加 --real。
         /// </summary>
@@ -32,8 +34,6 @@ namespace VisionToolDemo
                 return;
             }
 
-            // DPI 感知在 app.manifest 里已声明 PerMonitorV2，无需代码再设（WPF 无 WinForms 的 SetHighDpiMode）
-
             if (TryGetArgValue(args, "--run", out string graphPath))
             {
                 AttachToConsole();
@@ -42,39 +42,25 @@ namespace VisionToolDemo
                 return;
             }
 
-            var app = new System.Windows.Application
+            // 全局异常兜底：Avalonia UI 线程未捕获异常默认会终止进程（表现为"闪退"）。
+            // 这里拦截后弹窗说明原因并保持程序继续运行，至少用户能看见是哪一步出的问题。
+            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             {
-                ShutdownMode = System.Windows.ShutdownMode.OnMainWindowClose,
+                if (e.ExceptionObject is Exception ex)
+                    Wpf.Ui.Error("程序遇到未处理异常：\n" + ex.Message
+                        + "\n\n--- 堆栈 ---\n" + ex.StackTrace);
             };
-            app.Resources.MergedDictionaries.Add(new System.Windows.ResourceDictionary
-            {
-                Source = new Uri("pack://application:,,,/Wpf/Styles.xaml", UriKind.Absolute),
-            });
+            // 后台 Task 未观察异常默认不终止进程，吞掉避免任何后台路径把进程带崩
+            TaskScheduler.UnobservedTaskException += (_, e) => e.SetObserved();
 
-            // 恢复上次选择的界面主题（存在 %APPDATA%\VisionToolDemo\theme.json）
-            VisionToolDemo.Wpf.ThemeManager.Restore();
-
-            // 自动化真实执行（鼠标模拟/打字间隔/失败重试等待）期间让界面保持响应，
-            // 不再整窗假死（默认实现就是普通 Sleep，命令行/无头模式不受影响）
-            VisionToolDemo.Vision.Automation.UiWait.Sleep = ms => VisionToolDemo.Wpf.Ui.SleepResponsive(ms);
-
-            // —— 全局异常兜底：WPF 里 UI 线程未捕获异常默认会让进程直接终止（表现为"闪退"）。
-            //    这里拦截后弹窗说明原因并保持程序继续运行，至少用户能看见是哪一步出的问题。
-            app.DispatcherUnhandledException += (_, e) =>
-            {
-                System.Windows.MessageBox.Show(
-                    "程序遇到未处理异常（已阻止退出，可继续操作）：\n" + e.Exception.Message
-                    + "\n\n--- 堆栈 ---\n" + e.Exception.StackTrace,
-                    "VisionTool", System.Windows.MessageBoxButton.OK,
-                    System.Windows.MessageBoxImage.Warning);
-                e.Handled = true;
-            };
-            // 后台 Task 未观察异常在 .NET 里默认不终止进程，但也可能被 GC 时抛成
-            // UnobservedTaskException；吞掉避免任何后台路径把进程带崩。
-            System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) => e.SetObserved();
-
-            app.Run(new VisionToolDemo.Wpf.MainWindow());
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
+
+        /// <summary>Avalonia 应用构建器（跨平台桌面）</summary>
+        public static AppBuilder BuildAvaloniaApp()
+            => AppBuilder.Configure<App>()
+                .UsePlatformDetect()
+                .LogToTrace();
 
         // ================================================================ 无界面运行
 
@@ -105,7 +91,7 @@ namespace VisionToolDemo
 
             AutomationContext.DryRun = !real;
 
-            // 图文件读写：WPF 与无界面入口共用 AutomationGraphIO（从旧版编辑器抽出的纯序列化实现）
+            // 图文件读写：界面与无界面入口共用 AutomationGraphIO（纯序列化实现）
             AutomationGraph graph = new();
             try { AutomationGraphIO.Import(graph, File.ReadAllText(graphPath)); }
             catch (Exception ex)
@@ -161,9 +147,9 @@ namespace VisionToolDemo
             Console.WriteLine("VisionTool 视觉检测工作台");
             Console.WriteLine();
             Console.WriteLine("用法：");
-            Console.WriteLine("  VisionToolDemo.exe                        启动界面（WPF，按分辨率/DPI 自适应）");
-            Console.WriteLine("  VisionToolDemo.exe --run 图.autograph.json [--real] [--repeat N] [--quiet]");
-            Console.WriteLine("                                            无界面跑节点图（默认干跑；--real 才会动鼠标键盘）");
+            Console.WriteLine("  VisionToolDemo                        启动界面（Avalonia，跨 Windows/Linux，按分辨率/DPI 自适应）");
+            Console.WriteLine("  VisionToolDemo --run 图.autograph.json [--real] [--repeat N] [--quiet]");
+            Console.WriteLine("                                         无界面跑节点图（默认干跑；--real 才会动鼠标键盘）");
             Console.WriteLine();
             Console.WriteLine("退出码：0 = 正常且判定不是 NG；1 = 运行失败；2 = 判定 NG。");
         }

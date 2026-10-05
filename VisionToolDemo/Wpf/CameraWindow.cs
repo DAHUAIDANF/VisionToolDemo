@@ -1,10 +1,11 @@
 using System;
 using System.Globalization;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Threading;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 // 不能 using OpenCvSharp; —— 它有 Window/Point/Size/Rect，会和 System.Windows 的同名类型撞（CS0104）
 using Mat = OpenCvSharp.Mat;
 using VideoCapture = OpenCvSharp.VideoCapture;
@@ -19,10 +20,11 @@ namespace VisionToolDemo.Wpf
     /// 用法：选设备号与后端 → 「打开预览」→ 对准目标 → 「采一帧」把它送进视觉页当输入图。
     /// 后端说明：DSHOW 兼容性最好；MSMF 在部分 USB3 工业相机上更快，但有的驱动会打不开。
     /// </summary>
-    public sealed class CameraWindow : Window
+    public sealed class CameraWindow : Window, Ui.IModalResult
     {
         /// <summary>采到的那一帧（调用方持有；取消则为 null）</summary>
         public Mat CapturedMat { get; private set; }
+        public bool ModalResult { get; private set; }
 
         private readonly ComboBox _device, _backend;
         private readonly Image _view;
@@ -42,7 +44,7 @@ namespace VisionToolDemo.Wpf
 
             _device = Ui.Combo(new[] { "0", "1", "2", "3", "4", "5" }, 0);
             _backend = Ui.Combo(new[] { "DSHOW（兼容性最好）", "MSMF（部分相机更快）", "自动" }, 0);
-            _view = new Image { Stretch = System.Windows.Media.Stretch.Uniform };
+            _view = new Image { Stretch = Stretch.Uniform };
             _status = Ui.Dim("还没有打开相机。");
 
             var panel = new DockPanel { Margin = new Thickness(12) };
@@ -59,8 +61,8 @@ namespace VisionToolDemo.Wpf
             panel.Children.Add(top);
 
             var bottom = new StackPanel();
-            var bar = Ui.Bar(Ui.Btn("采一帧并返回", Capture, true), Ui.Btn("取消", () => { DialogResult = false; }));
-            bar.HorizontalAlignment = HorizontalAlignment.Left;
+            var bar = Ui.Bar(Ui.Btn("采一帧并返回", Capture, true), Ui.Btn("取消", () => { ModalResult = false; Close(); }));
+            bar.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
             bottom.Children.Add(bar);
             bottom.Children.Add(_status);
             DockPanel.SetDock(bottom, Dock.Bottom);
@@ -126,9 +128,9 @@ namespace VisionToolDemo.Wpf
                 frame.CopyTo(_last);
 
                 // 复用同一个 WriteableBitmap：尺寸变了才重建，之后每帧只 WritePixels
-                if (_wb == null || _wb.PixelWidth != _last.Cols || _wb.PixelHeight != _last.Rows)
+                if (_wb == null || _wb.PixelSize.Width != _last.Cols || _wb.PixelSize.Height != _last.Rows)
                 {
-                    _wb = new WriteableBitmap(_last.Cols, _last.Rows, 96, 96, PixelFormats.Bgra32, null);
+                    _wb = MatImage.CreateWriteableBitmap(_last.Cols, _last.Rows);
                     _scratch = null;
                     _view.Source = _wb;
                 }
@@ -162,7 +164,7 @@ namespace VisionToolDemo.Wpf
             // 交出去的是**副本**：_last 还要留给预览循环复用
             CapturedMat = _last.Clone();
             CloseCamera();
-            DialogResult = true;
+            ModalResult = true; Close();
         }
     }
 }

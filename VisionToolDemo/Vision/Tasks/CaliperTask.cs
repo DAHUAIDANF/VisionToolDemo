@@ -81,6 +81,17 @@ namespace VisionToolDemo.Vision.Tasks
                 DefaultValue = 100,
                 DisplayFormat = "带宽:{0}",
                 ForceOdd = false
+            },
+            new TaskParamDesc
+            {
+                // VisionMaster 卡尺的"边缘极性"：只找指定方向的跳变，避免亮线暗线上都出沿
+                ParamName = "边缘极性 0任意1亮到暗2暗到亮",
+                Min = 0,
+                Max = 2,
+                DefaultValue = 0,
+                DisplayFormat = "极性:{0}",
+                Tip = "亮到暗=灰度从亮变暗的边（白→黑）；暗到亮=灰度从暗变亮的边（黑→白）。" +
+                      "0任意：两条都找；测亮线上边缘用1，测暗线边缘用2。"
             }
         ];
 
@@ -90,6 +101,8 @@ namespace VisionToolDemo.Vision.Tasks
                 return new Mat();
             int edgeThresh = paramValues[0];
             int bandHalf = Math.Max(1, paramValues[1] / 2);
+            // 边缘极性（老链 Values 可能没有第 3 个参数，缺省=任意）
+            int polar = paramValues.Length > 2 ? paramValues[2] : 0;
 
             Mat dst = VisionHelper.ToBgrCopy(srcMat);
             LastSummary = "";
@@ -140,30 +153,40 @@ namespace VisionToolDemo.Vision.Tasks
             }
 
             // 一阶差分求梯度，只在连续有效段内找最强上升/下降沿
+            // （VisionMaster 卡尺逻辑：按"边缘极性"只收指定方向的沿；任意=两条都找）
             int bestRise = -1, bestFall = -1;
             double maxGrad = 0, minGrad = 0;
             for (int i = 1; i < sampleCount; i++)
             {
                 if (!valid[i] || !valid[i - 1]) continue;
                 double grad = profile[i] - profile[i - 1];
+                if (polar == 2 && grad <= 0) continue;   // 只要暗到亮：忽略下降
+                if (polar == 1 && grad >= 0) continue;   // 只要亮到暗：忽略上升
                 if (grad > maxGrad) { maxGrad = grad; bestRise = i; }
                 if (grad < minGrad) { minGrad = grad; bestFall = i; }
             }
 
-            // —— 绘制：只在结果图上标注找到的边缘线 ——
-            bool hasRise = bestRise > 0 && maxGrad >= edgeThresh;
-            bool hasFall = bestFall > 0 && -minGrad >= edgeThresh;
-            if (hasRise)
-                DrawEdgeLine(dst, cx, cy, dirX, dirY, nX, nY, halfLength, bandHalf, bestRise, Scalar.LimeGreen);
-            if (hasFall)
-                DrawEdgeLine(dst, cx, cy, dirX, dirY, nX, nY, halfLength, bandHalf, bestFall, Scalar.Orange);
+            bool hasRise = polar != 1 && bestRise > 0 && maxGrad >= edgeThresh;
+            bool hasFall = polar != 2 && bestFall > 0 && -minGrad >= edgeThresh;
 
-            // 摘要：边缘位置相对带中心的偏移（px）
+            // 亚像素定位：对最强梯度峰做抛物线内插（与圆卡尺同一套公式），
+            // 边缘位置精度从整像素提升到约 0.1px，量测才有意义。
+            double risePos = hasRise ? Subpixel(profile, sampleCount, bestRise, maxGrad) : 0;
+            double fallPos = hasFall ? Subpixel(profile, sampleCount, bestFall, minGrad) : 0;
+
+            // —— 绘制：只在结果图上标注找到的边缘线 ——
+            if (hasRise)
+                DrawEdgeLine(dst, cx, cy, dirX, dirY, nX, nY, halfLength, bandHalf, risePos, Scalar.LimeGreen);
+            if (hasFall)
+                DrawEdgeLine(dst, cx, cy, dirX, dirY, nX, nY, halfLength, bandHalf, fallPos, Scalar.Orange);
+
+            // 摘要：边缘位置相对带中心的偏移（px，亚像素一位小数）
             if (hasRise || hasFall)
             {
-                string riseTxt = hasRise ? $"{bestRise - halfLength}px" : "—";
-                string fallTxt = hasFall ? $"{bestFall - halfLength}px" : "—";
-                LastSummary = $"直线卡尺: 上升沿 {riseTxt} 下降沿 {fallTxt}";
+                string riseTxt = hasRise ? $"{risePos - halfLength:F1}px" : "—";
+                string fallTxt = hasFall ? $"{fallPos - halfLength:F1}px" : "—";
+                string polarTxt = polar == 1 ? " 亮到暗" : polar == 2 ? " 暗到亮" : "";
+                LastSummary = $"直线卡尺{polarTxt}: 上升沿 {riseTxt} 下降沿 {fallTxt}";
             }
             else
             {
@@ -173,15 +196,27 @@ namespace VisionToolDemo.Vision.Tasks
             return dst;
         }
 
-        /// <summary>在结果图上画找到的边缘线：垂直于扫描方向、横贯扫描带的线段</summary>
-        private static void DrawEdgeLine(Mat dst, int cx, int cy, double dirX, double dirY, double nX, double nY, int halfLength, int bandHalf, int idx, Scalar color)
+        /// <summary>在结果图上画找到的边缘线：垂直于扫描方向、横贯扫描带的线段（位置可亚像素）</summary>
+        private static void DrawEdgeLine(Mat dst, int cx, int cy, double dirX, double dirY, double nX, double nY, int halfLength, int bandHalf, double idx, Scalar color)
         {
-            int t = idx - halfLength;
+            double t = idx - halfLength;
             double ex = cx + (t * dirX);
             double ey = cy + (t * dirY);
             Point p1 = new((int)(ex + (nX * bandHalf)), (int)(ey + (nY * bandHalf)));
             Point p2 = new((int)(ex - (nX * bandHalf)), (int)(ey - (nY * bandHalf)));
             Cv2.Line(dst, p1, p2, color, 2, LineTypes.AntiAlias);
+        }
+
+        /// <summary>梯度峰抛物线内插求亚像素位置（差分域三点的抛物顶点）</summary>
+        private static double Subpixel(double[] profile, int count, int idx, double peakGrad)
+        {
+            double g0 = idx - 1 >= 1 ? profile[idx - 1] - profile[idx - 2] : peakGrad;
+            double g2 = idx + 1 < count ? profile[idx + 1] - profile[idx] : peakGrad;
+            double denom = g2 - (2 * peakGrad) + g0;
+            double delta = Math.Abs(denom) > 1e-9 ? 0.5 + ((peakGrad - g2) / denom) : 0;
+            if (delta < -0.5) delta = -0.5;
+            if (delta > 0.5) delta = 0.5;
+            return idx + delta - 0.5;
         }
 
         /// <summary>双线性插值采样，获得亚像素灰度值</summary>

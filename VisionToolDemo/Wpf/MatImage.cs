@@ -1,24 +1,27 @@
 using System;
 using System.Runtime.InteropServices;
-using System.Windows;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
+using Avalonia;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using OpenCvSharp;
 
 namespace VisionToolDemo.Wpf
 {
     /// <summary>
-    /// OpenCvSharp 的 Mat → WPF 可显示的位图。
+    /// OpenCvSharp 的 Mat → Avalonia 可显示的位图（WriteableBitmap）。
     ///
     /// 性能上有三个关键点（界面卡顿主要就出在这类地方）：
     ///   1. **大图降采样**：1920x1080 转成 BGRA 要 8MB，4K 要 33MB。屏幕上反正显示不了那么多像素，
     ///      预览按"最多 ~240 万像素"缩一下，内存与耗时都降一个量级；
     ///   2. **同一个 Mat 不重复转**：选中切换、切页签会反复请求同一张图，这里做一层缓存；
-    ///   3. **相机预览零分配**：每帧都 new byte[] + 新建 BitmapSource（8MB/帧 × 12fps ≈ 96MB/s 垃圾）
+    ///   3. **相机预览零分配**：每帧都 new byte[] + 新建位图（8MB/帧 × 12fps ≈ 96MB/s 垃圾）
     ///      会让 GC 频繁触发，表现就是"视频/预览一顿一顿"。这里提供 WriteIntoBitmap，
     ///      复用同一块缓冲与同一个 WriteableBitmap。
     ///
     /// 像素一律**拷贝后冻结**：直接引用 Mat 内存在 Mat 被释放后会出现黑块或崩。
+    /// 【Avalonia 11 迁移】无 BitmapSource.Create/Freeze/WritePixels：
+    ///   显示位图 = WriteableBitmap（实现 IImage，可作 Image.Source）；
+    ///   写像素 = Lock() → ILockedFramebuffer.Address 上 Marshal.Copy → Dispose 提交。
     /// </summary>
     public static class MatImage
     {
@@ -26,7 +29,7 @@ namespace VisionToolDemo.Wpf
         public const int DefaultMaxPixels = 2_400_000;
 
         private static Mat _cacheKey;
-        private static BitmapSource _cacheBmp;
+        private static WriteableBitmap _cacheBmp;
         private static int _cacheMaxPixels;
         private static double _cacheScale = 1.0;   // 显示位图 → 原图 的倍率（降采样后 > 1）
 
@@ -37,7 +40,11 @@ namespace VisionToolDemo.Wpf
             _cacheBmp = null;
         }
 
-        public static BitmapSource ToBitmapSource(Mat mat, int maxPixels = DefaultMaxPixels)
+        /// <summary>按像素尺寸新建 Bgra8888 可写位图（相机预览等复用位图场景用；96 DPI 逻辑像素）</summary>
+        public static WriteableBitmap CreateWriteableBitmap(int width, int height)
+            => new(new PixelSize(width, height), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Opaque);
+
+        public static WriteableBitmap ToBitmapSource(Mat mat, int maxPixels = DefaultMaxPixels)
             => ToBitmapSource(mat, out _, maxPixels);
 
         /// <summary>
@@ -46,7 +53,7 @@ namespace VisionToolDemo.Wpf
         /// （像素值显示、ROI 框选、从选区裁模板）都必须乘上这个倍率**，
         /// 否则就是"框选的位置和鼠标点对不上"。
         /// </summary>
-        public static BitmapSource ToBitmapSource(Mat mat, out double toOriginalScale, int maxPixels = DefaultMaxPixels)
+        public static WriteableBitmap ToBitmapSource(Mat mat, out double toOriginalScale, int maxPixels = DefaultMaxPixels)
         {
             toOriginalScale = 1.0;
             if (mat == null || mat.Empty()) { ResetCache(); return null; }
@@ -58,7 +65,7 @@ namespace VisionToolDemo.Wpf
                 return _cacheBmp;
             }
 
-            BitmapSource bmp;
+            WriteableBitmap bmp;
             double displayScale = 1.0;
             try { bmp = Convert(mat, maxPixels, out displayScale); }
             catch (ObjectDisposedException) { return null; }   // 已释放的图：显示空白总比崩好
@@ -71,7 +78,7 @@ namespace VisionToolDemo.Wpf
             return bmp;
         }
 
-        private static BitmapSource Convert(Mat mat, int maxPixels, out double displayScale)
+        private static WriteableBitmap Convert(Mat mat, int maxPixels, out double displayScale)
         {
             int w = mat.Cols, h = mat.Rows;
             double scale = 1.0;
@@ -94,27 +101,36 @@ namespace VisionToolDemo.Wpf
                 else bgra = ToBgra(mat);
 
                 int bw = bgra.Cols, bh = bgra.Rows;
-                int stride = bw * 4;
-                var buffer = new byte[stride * bh];
-                if (bgra.IsContinuous())
-                {
-                    Marshal.Copy(bgra.Data, buffer, 0, buffer.Length);
-                }
-                else
-                {
-                    // 逐行拷：Mat 的行之间可能有 padding，不能整块拷
-                    for (int y = 0; y < bh; y++)
-                        Marshal.Copy(bgra.Data + (y * (int)bgra.Step()), buffer, y * stride, stride);
-                }
-
-                var bmp = BitmapSource.Create(bw, bh, 96, 96, PixelFormats.Bgra32, null, buffer, stride);
-                bmp.Freeze();
+                var bmp = new WriteableBitmap(
+                    new PixelSize(bw, bh),
+                    new Vector(96, 96),
+                    PixelFormat.Bgra8888,
+                    AlphaFormat.Opaque);
+                CopyBgraTo(bgra, bmp);
                 return bmp;
             }
             finally
             {
                 if (bgra != null && !ReferenceEquals(bgra, mat)) bgra.Dispose();
                 work?.Dispose();
+            }
+        }
+
+        /// <summary>把 BGRA Mat 拷进 WriteableBitmap（Lock → Marshal.Copy → 提交）</summary>
+        private static void CopyBgraTo(Mat bgra, WriteableBitmap bmp)
+        {
+            int w = bmp.PixelSize.Width, h = bmp.PixelSize.Height;
+            int stride = w * 4;
+            using (var fb = bmp.Lock())
+            {
+                var dst = fb.Address;
+                // 统一逐行拷：Mat 行间可能有 padding，整块拷会错位；逐行保证正确
+                var row = new byte[stride];
+                for (int y = 0; y < h; y++)
+                {
+                    Marshal.Copy(bgra.Data + (y * (int)bgra.Step()), row, 0, stride);
+                    Marshal.Copy(row, 0, dst + y * stride, stride);
+                }
             }
         }
 
@@ -138,7 +154,7 @@ namespace VisionToolDemo.Wpf
         /// 刻意**不走上面那个单槽缓存**：模板预览与主图像显示会互相挤掉缓存，
         /// 反而让主图每次都要重新转换。缩略图本身很小，随手转一份即可。
         /// </summary>
-        public static BitmapSource ToThumbnail(Mat mat, int maxSide = 160)
+        public static WriteableBitmap ToThumbnail(Mat mat, int maxSide = 160)
         {
             if (mat == null || mat.Empty()) return null;
             int side = Math.Max(48, maxSide);
@@ -155,7 +171,7 @@ namespace VisionToolDemo.Wpf
         public static bool WriteIntoBitmap(WriteableBitmap target, Mat mat, ref byte[] scratch)
         {
             if (target == null || mat == null || mat.Empty()) return false;
-            if (mat.Cols != target.PixelWidth || mat.Rows != target.PixelHeight) return false;
+            if (mat.Cols != target.PixelSize.Width || mat.Rows != target.PixelSize.Height) return false;
 
             Mat bgra = null;
             try
@@ -169,7 +185,7 @@ namespace VisionToolDemo.Wpf
                     else return false;
                 }
 
-                int w = target.PixelWidth, h = target.PixelHeight;
+                int w = target.PixelSize.Width, h = target.PixelSize.Height;
                 int stride = w * 4;
                 int need = stride * h;
                 if (scratch == null || scratch.Length != need) scratch = new byte[need];
@@ -179,7 +195,10 @@ namespace VisionToolDemo.Wpf
                     for (int y = 0; y < h; y++)
                         Marshal.Copy(bgra.Data + (y * (int)bgra.Step()), scratch, y * stride, stride);
 
-                target.WritePixels(new Int32Rect(0, 0, w, h), scratch, stride, 0);
+                using (var fb = target.Lock())
+                {
+                    Marshal.Copy(scratch, 0, fb.Address, need);
+                }
                 return true;
             }
             finally

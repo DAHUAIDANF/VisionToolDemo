@@ -41,28 +41,38 @@ namespace VisionToolDemo.Vision.Automation
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern bool EnumDisplaySettings(string deviceName, int modeNum, ref DEVMODE devMode);
 
-        /// <summary>本进程是否 DPI 感知。不感知时"逻辑坐标 ≠ 物理像素"，坐标必须换算</summary>
+        /// <summary>本进程是否 DPI 感知。不感知时"逻辑坐标 ≠ 物理像素"，坐标必须换算。
+        /// 【跨平台】user32 只存在于 Windows：Linux 由 Avalonia/Wayland 负责 DPI，恒视为感知。</summary>
         public static bool IsDpiAware
         {
-            get { try { return IsProcessDPIAware(); } catch { return true; } }
+            get
+            {
+                if (!OperatingSystem.IsWindows()) return true;
+                try { return IsProcessDPIAware(); } catch { return true; }
+            }
         }
 
-        /// <summary>本进程看到的屏幕尺寸（DPI 不感知时是虚拟化后的尺寸）</summary>
+        /// <summary>本进程看到的屏幕尺寸（DPI 不感知时是虚拟化后的尺寸）。
+        /// 【跨平台】Linux 无 user32：退回默认全高清，缩放比恒 1:1（Avalonia 自带 DPI 适配）。</summary>
         public static System.Drawing.Size ProcessScreenSize
         {
             get
             {
+                if (!OperatingSystem.IsWindows())
+                    return new System.Drawing.Size(1920, 1080);
                 int w = Math.Max(1, GetSystemMetrics(0));
                 int h = Math.Max(1, GetSystemMetrics(1));
                 return new System.Drawing.Size(w, h);
             }
         }
 
-        /// <summary>主显示器的**物理**像素尺寸（DPI 不感知的进程也能拿到；失败时退回进程尺寸）</summary>
+        /// <summary>主显示器的**物理**像素尺寸（DPI 不感知的进程也能拿到；失败时退回进程尺寸）。
+        /// 【跨平台】Linux 无 EnumDisplaySettings：退回进程尺寸（1:1）。</summary>
         public static System.Drawing.Size PhysicalScreenSize
         {
             get
             {
+                if (!OperatingSystem.IsWindows()) return ProcessScreenSize;
                 try
                 {
                     var dm = new DEVMODE { dmSize = (short)Marshal.SizeOf<DEVMODE>() };
@@ -134,113 +144,15 @@ namespace VisionToolDemo.Vision.Automation
         /// 坐标系自检：报出两套尺寸，并**实测**一次"屏幕上的标记在抓屏图里落在哪"，
         /// 直接给出图像坐标与屏幕坐标的偏差。
         ///
-        /// 这一步能一眼看出"截图与实际对不上"到底是 DPI 缩放、还是别的偏移；
-        /// 偏差不为 0 时，点击算子就会照着错的坐标点下去。
+        /// 【Avalonia 迁移阶段】原 WPF 标定窗口（System.Windows.Window + DispatcherFrame）
+        /// 已随 WPF 移除，暂返回坐标空间报告；跨平台标定自检在 Task 18 用 Avalonia 窗口重写。
         /// </summary>
         public static string SelfTest()
         {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine(Describe());
-
-            var mark = new System.Windows.Window
-            {
-                Title = "",
-                WindowStyle = System.Windows.WindowStyle.None,
-                Topmost = true,
-                WindowStartupLocation = System.Windows.WindowStartupLocation.Manual,
-                Left = 260,
-                Top = 240,
-                Width = 360,
-                Height = 260,
-                Background = System.Windows.Media.Brushes.White,
-                ShowInTaskbar = false,
-            };
-            var canvas = new System.Windows.Controls.Canvas { Width = 360, Height = 260 };
-            var ellipse = new System.Windows.Shapes.Ellipse
-            {
-                Width = 120, Height = 90,
-                Fill = System.Windows.Media.Brushes.Red,
-            };
-            System.Windows.Controls.Canvas.SetLeft(ellipse, 90);
-            System.Windows.Controls.Canvas.SetTop(ellipse, 70);
-            canvas.Children.Add(ellipse);
-            var rect = new System.Windows.Shapes.Rectangle
-            {
-                Width = 90, Height = 60,
-                Fill = System.Windows.Media.Brushes.Blue,
-            };
-            System.Windows.Controls.Canvas.SetLeft(rect, 230);
-            System.Windows.Controls.Canvas.SetTop(rect, 170);
-            canvas.Children.Add(rect);
-            mark.Content = canvas;
-            mark.Show();
-            DoEvents();
-            System.Threading.Thread.Sleep(250);
-            DoEvents();
-            try
-            {
-                if (!ScreenCapture.TryCapture(ScreenCapture.VirtualBounds, out Mat full, out string err))
-                {
-                    sb.AppendLine("抓屏失败：" + err);
-                    return sb.ToString();
-                }
-                using (full)
-                {
-                    sb.AppendLine(string.Format("抓屏尺寸：{0}x{1}", full.Cols, full.Rows));
-
-                    double scale = ImageToScreenScale(full);
-                    // 我们画的椭圆是**纯红**（BGR 0,0,255），在抓屏图里按颜色找它的质心 ——
-                    // 这是独立测量：不拿整屏图里的东西当模板再回找自己（那样永远"对齐"，什么也测不出来）
-                    // WPF PointToScreen 在 PerMonitorV2 感知下返回物理像素，与抓屏坐标同一空间
-                    var centerScreen = mark.PointToScreen(new System.Windows.Point(150, 115));
-                    var vb = ScreenCapture.VirtualBounds;
-                    int ex = (int)Math.Round((centerScreen.X - vb.Left) / scale);
-                    int ey = (int)Math.Round((centerScreen.Y - vb.Top) / scale);
-
-                    int rx = Math.Max(0, ex - 140), ry = Math.Max(0, ey - 110);
-                    int rw = Math.Min(280, full.Cols - rx), rh = Math.Min(220, full.Rows - ry);
-                    if (rw < 20 || rh < 20)
-                    {
-                        sb.AppendLine("标记超出抓屏范围，跳过实测");
-                    }
-                    else
-                    {
-                        using var roi = new Mat(full, new Rect(rx, ry, rw, rh));
-                        using var mask = new Mat();
-                        Cv2.InRange(roi, new Scalar(0, 0, 200), new Scalar(60, 60, 255), mask);
-                        var moments = Cv2.Moments(mask, true);
-                        if (moments.M00 < 50)
-                        {
-                            sb.AppendLine("抓屏图里找不到那个红色标记 —— 抓到的画面里没有本窗口？");
-                            sb.AppendLine("结论：**对不齐**（标记都不在抓屏里），请把这段报告发给开发者。");
-                        }
-                        else
-                        {
-                            int ux = rx + (int)Math.Round(moments.M10 / moments.M00);
-                            int uy = ry + (int)Math.Round(moments.M01 / moments.M00);
-                            int dx = ux - ex, dy = uy - ey;
-                            sb.AppendLine(string.Format("标记实测：图内 ({0},{1})，按换算比期望 ({2},{3})", ux, uy, ex, ey));
-                            sb.AppendLine(string.Format("图像坐标 → 屏幕坐标 换算比 = {0:F4}（偏差 dx={1} dy={2} 图内像素）",
-                                scale, dx, dy));
-                            sb.AppendLine(Math.Abs(dx) <= 2 && Math.Abs(dy) <= 2
-                                ? "结论：抓屏与屏幕对齐（换算后点击会落在正确位置）。"
-                                : "结论：**对不齐**！偏差不为 0，点击会偏 —— 请把这段报告发给开发者。");
-                        }
-                    }
-                }
-            }
-            finally { mark.Close(); }
+            sb.AppendLine("【迁移阶段】标定自检窗口尚未迁移（Task 18），坐标换算逻辑已保留，可先用 'Describe' 报告核对尺寸。");
             return sb.ToString();
-        }
-
-        /// <summary>WPF 版 DoEvents：把 Dispatcher 队列里待处理的消息跑一遍（替代 WinForms 的 Application.DoEvents）</summary>
-        private static void DoEvents()
-        {
-            var frame = new System.Windows.Threading.DispatcherFrame();
-            System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(
-                System.Windows.Threading.DispatcherPriority.Background,
-                new Action(() => frame.Continue = false));
-            System.Windows.Threading.Dispatcher.PushFrame(frame);
         }
     }
 }

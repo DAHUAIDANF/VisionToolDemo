@@ -109,9 +109,20 @@ namespace VisionToolDemo.Vision.Tasks
                 ChessboardFlags.AdaptiveThresh | ChessboardFlags.NormalizeImage | ChessboardFlags.FastCheck);
             if (!found)
             {
-                // 换用圆点阵列再试一次（有些标定板是圆点）
-                found = Cv2.FindCirclesGrid(gray, new Size(cols, rows), out cornersArr,
-                    FindCirclesGridFlags.SymmetricGrid);
+                // 换用圆点阵列再试一次（有些标定板是圆点）。
+                // 注意：OpenCV 4.13（Windows runtime）在图中没有任何圆点 blob 时，
+                // findCirclesGrid 会直接抛 "samples is empty"（4.10 Linux 只返回 false），
+                // 这里必须兜住异常，按“未检测到标定板”走人话提示分支。
+                try
+                {
+                    found = Cv2.FindCirclesGrid(gray, new Size(cols, rows), out cornersArr,
+                        FindCirclesGridFlags.SymmetricGrid);
+                }
+                catch (Exception)
+                {
+                    found = false;
+                    cornersArr = null;
+                }
                 if (found) LastSummary = "(识别为圆点阵列) ";
             }
 

@@ -1,35 +1,49 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Windows;
-using System.Windows.Media;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Media;
+using Avalonia.Styling;
 
 namespace VisionToolDemo.Wpf
 {
-    /// <summary>
-    /// 主题管理器：多套界面配色 + 即时切换 + 持久化。
-    /// 原理：Styles.xaml 里所有颜色都是 Application.Resources 中的 SolidColorBrush 实例，
-    /// 各控件模板用 StaticResource 引用的是同一个实例。因此切换主题时**就地改这些实例的
-    /// Color**，全界面所有引用（包括已解析的 StaticResource）会立即跟随变色，无需重建模板。
-    /// 持久化：主题名写入 %APPDATA%\VisionToolDemo\theme.json，启动时自动恢复。
-    /// </summary>
+    /// <summary>一套主题的调色板（显示名 + 颜色表）</summary>
     public sealed class ThemePalette
     {
-        /// <summary>主题显示名</summary>
         public string Name { get; set; } = "";
-
-        /// <summary>颜色表：资源 key → 颜色</summary>
         public Dictionary<string, Color> Colors { get; } = new();
 
         public ThemePalette(string name) { Name = name; }
 
-        /// <summary>链式设置单个颜色</summary>
         public ThemePalette Set(string key, Color c) { Colors[key] = c; return this; }
     }
 
+    /// <summary>
+    /// 主题管理器（Avalonia 版）：多套界面配色 + 即时切换 + 持久化。
+    ///
+    /// 与 WPF 版的本质区别：Avalonia 的 SolidColorBrush 不可变，不能"就地改实例"，
+    /// 因此改为【替换主题资源字典】：5 套配色各是一个 Wpf/Themes/*.axaml 资源字典，
+    /// 切换时清空 Application.Resources.MergedDictionaries 并加载新主题字典；
+    /// 控件样式与页面里所有颜色都通过 {DynamicResource Key} 引用，字典一换，
+    /// 全界面（含已实例化控件）自动跟随，无需重建模板。
+    /// 同时切换 Fluent 主题的 RequestedThemeVariant（深色主题=Dark，亮色浅色=Light），
+    /// 让 Fluent 默认控件（输入框/下拉框/勾选框等）的底色也随主题走。
+    /// 持久化：主题名写入 %APPDATA%\VisionToolDemo\theme.json，启动时自动恢复。
+    /// </summary>
     public static class ThemeManager
     {
-        /// <summary>所有内置主题（索引 0 = 默认深蓝灰，与老界面一致）</summary>
+        /// <summary>主题资源字典文件名（Wpf/Themes/*.axaml）</summary>
+        private static readonly string[] ThemeFiles =
+        [
+            "DeepBlueGray",   // 0 深蓝灰（默认）
+            "DeepGreen",      // 1 深墨绿
+            "DeepPurple",     // 2 深紫罗兰
+            "WarmOrange",     // 3 暖橙红
+            "Light",          // 4 亮色浅色
+        ];
+
+        /// <summary>所有内置主题（索引 0 = 默认深蓝灰）</summary>
         public static readonly ThemePalette[] Themes =
         [
             MakeDefault(),
@@ -42,51 +56,49 @@ namespace VisionToolDemo.Wpf
         /// <summary>当前主题索引（默认 0）</summary>
         public static int Current { get; private set; }
 
-        /// <summary>
-        /// 页面级合并了 Styles.xaml 的根元素（每页一套独立 brush 实例，与 Application 级不同步）。
-        /// 注册后主题切换会同步就地改这些页面字典里的实例，保证页面颜色即时跟随。
-        /// </summary>
-        private static readonly List<FrameworkElement> _pageRoots = new();
+        /// <summary>主题切换事件：页面/窗口可订阅做额外刷新（代码构建的控件配色重设等）</summary>
+        public static event Action<int> ThemeChanged;
+
+        /// <summary>已注册的页面根（兼容旧接口；Avalonia 下页面颜色靠 DynamicResource 自动跟随）</summary>
+        private static readonly List<object> _pageRoots = new();
 
         /// <summary>
-        /// 页面注册：把页面根元素加入主题同步列表，并立即把当前主题应用到其合并字典
-        /// （懒加载页面创建时调用，避免新页面显示默认配色）。
+        /// 页面注册（兼容 WPF 版接口）：记录页面根元素。
+        /// Avalonia 下页面颜色全部经 DynamicResource 引用主题字典，切换时自动跟随，
+        /// 无需像 WPF 那样就地改页面级字典。
         /// </summary>
-        public static void RegisterPage(FrameworkElement root)
+        public static void RegisterPage(object root)
         {
             if (root == null || _pageRoots.Contains(root)) return;
             _pageRoots.Add(root);
-            if (Application.Current == null) return;
-            try
-            {
-                foreach (ResourceDictionary m in root.Resources.MergedDictionaries)
-                    Repaint(m, Themes[Current]);
-            }
-            catch (Exception ex) { Log("页面注册同步异常: " + ex.Message); }
         }
 
-        /// <summary>切换到指定主题并持久化；无 WPF 环境（无头/冒烟）时静默跳过</summary>
+        /// <summary>切换到指定主题并持久化；无 Avalonia 环境（无头/冒烟）时静默跳过</summary>
         public static void Apply(int index)
         {
             if (index < 0 || index >= Themes.Length) return;
             Current = index;
-            var t = Themes[index];
             try
             {
-                if (Application.Current == null) return;
-                Log("开始应用");
-                Repaint(Application.Current.Resources, t);
-                // 页面级合并的 Styles.xaml 实例是独立 brush，必须一并就地改色，主题才能即时生效
-                foreach (var root in _pageRoots)
+                var app = Application.Current;
+                if (app == null) return;
+
+                // 1) 切换 Fluent 主题明暗（深色主题=Dark，亮色浅色=Light），标准控件底色跟随
+                app.RequestedThemeVariant = index == 4 ? ThemeVariant.Light : ThemeVariant.Dark;
+
+                // 2) 替换 Application 级合并的主题字典：清空 → 加载新主题
+                if (app.Resources is ResourceDictionary rd)
                 {
-                    try
-                    {
-                        foreach (ResourceDictionary m in root.Resources.MergedDictionaries)
-                            Repaint(m, t);
-                    }
-                    catch (Exception ex) { Log("页面同步异常: " + ex.Message); }
+                    rd.MergedDictionaries.Clear();
+                    // Avalonia 11 的 ResourceDictionary 没有 Source 属性，
+                    // 用 AvaloniaXamlLoader 直接加载主题 .axaml 资源字典
+                    var dict = Avalonia.Markup.Xaml.AvaloniaXamlLoader.Load(
+                        new Uri("avares://VisionToolDemo/Wpf/Themes/" + ThemeFiles[index] + ".axaml")) as ResourceDictionary;
+                    if (dict != null) rd.MergedDictionaries.Add(dict);
                 }
-                Log("应用完成");
+
+                Log("应用完成 -> " + Themes[index].Name);
+                ThemeChanged?.Invoke(index);
             }
             catch (Exception ex)
             {
@@ -96,43 +108,12 @@ namespace VisionToolDemo.Wpf
             Save();
         }
 
-        /// <summary>
-        /// 递归遍历资源字典（含全部 MergedDictionaries），对每个颜色 key **就地改 SolidColorBrush 实例**。
-        /// 关键：ResourceDictionary 的索引器【不查 MergedDictionaries】，直接 Application.Current.Resources[key]
-        /// 永远取不到 Styles.xaml 里的实例；而控件 StaticResource 早已一次性绑定到 merged 里的实例，
-        /// 只有就地改这个实例，已加载的所有控件才会即时变色（替换键对已绑定控件无效——那是主题不生效的根因）。
-        /// </summary>
-        private static void Repaint(ResourceDictionary rd, ThemePalette t)
-        {
-            if (rd == null) return;
-            foreach (ResourceDictionary m in rd.MergedDictionaries)
-                Repaint(m, t);
-            foreach (var kv in t.Colors)
-            {
-                if (rd[kv.Key] is not SolidColorBrush b) continue;   // 只查本字典直接定义的键
-                try
-                {
-                    // 就地改：已绑定控件（含 StaticResource 与 DynamicResource）全部跟随
-                    b.Color = kv.Value;
-                    Log($"  {kv.Key}: #{(kv.Value.R << 16) | (kv.Value.G << 8) | kv.Value.B:X6} (就地改)");
-                }
-                catch (InvalidOperationException)
-                {
-                    // 个别被冻结（Style Setter 共享时 WPF 会冻结 Freezable）的 brush 无法就地改：
-                    // 替换键 + 控件改为 DynamicResource 引用（Styles.xaml 的 Setter 已是动态引用）即跟随
-                    rd[kv.Key] = new SolidColorBrush(kv.Value);
-                    Log($"  {kv.Key}: #{(kv.Value.R << 16) | (kv.Value.G << 8) | kv.Value.B:X6} (冻结→替换键)");
-                }
-            }
-        }
-
-        /// <summary>诊断日志：主题切换详情写 %APPDATA%\VisionToolDemo\theme.log，实机排查"哪个键没变色"用</summary>
+        /// <summary>诊断日志：主题切换详情写 %APPDATA%\VisionToolDemo\theme.log</summary>
         private static void Log(string line)
         {
             try
             {
                 string path = ConfigPath().Replace("theme.json", "theme.log");
-                // 首次启动时 %APPDATA%\VisionToolDemo 目录可能尚不存在，先创建避免日志静默丢失
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                 File.AppendAllText(path, DateTime.Now.ToString("HH:mm:ss") + " 主题[" + Themes[Current].Name + "] " + line + Environment.NewLine);
             }
@@ -166,7 +147,7 @@ namespace VisionToolDemo.Wpf
             catch { }
         }
 
-        /// <summary>配置文件路径：%APPDATA%\VisionToolDemo\theme.json</summary>
+        /// <summary>配置文件路径：%APPDATA%\VisionToolDemo\theme.json（Linux 上为 ~/.config/VisionToolDemo/theme.json）</summary>
         private static string ConfigPath()
         {
             string dir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
@@ -183,9 +164,9 @@ namespace VisionToolDemo.Wpf
             .Set("CardBgHover", Rgb(0x3E, 0x49, 0x59))
             .Set("NavBg", Rgb(0x12, 0x16, 0x1C))
             .Set("Line", Rgb(0x4A, 0x56, 0x66))
-            .Set("Fg", Rgb(0xFF, 0xFF, 0xFF))
-            .Set("FgDim", Rgb(0xE6, 0xE6, 0xE6))
-            .Set("FgFaint", Rgb(0xC0, 0xC0, 0xC0))
+            .Set("Fg", Rgb(0xF6, 0xF9, 0xFD))
+            .Set("FgDim", Rgb(0xCB, 0xD4, 0xE0))
+            .Set("FgFaint", Rgb(0xB4, 0xBF, 0xCE))
             .Set("Accent", Rgb(0x4C, 0x8D, 0xF6))
             .Set("AccentDim", Rgb(0x20, 0x30, 0x4A))
             .Set("Ok", Rgb(0x45, 0xDE, 0xA8))
@@ -193,7 +174,7 @@ namespace VisionToolDemo.Wpf
             .Set("Ng", Rgb(0xFF, 0x8A, 0x8A))
             .Set("InputBg", Rgb(0x10, 0x15, 0x1B))
             .Set("SelBg", Rgb(0x40, 0x50, 0x6B))
-            .Set("CardSubFg", Rgb(0xFF, 0xFF, 0xFF))
+            .Set("CardSubFg", Rgb(0xD3, 0xDB, 0xE6))
             .Set("OnAccent", Rgb(0xFF, 0xFF, 0xFF));
 
         /// <summary>② 深墨绿：工业仪表风格</summary>
@@ -259,7 +240,7 @@ namespace VisionToolDemo.Wpf
             .Set("CardSubFg", Rgb(0xFF, 0xFF, 0xFF))
             .Set("OnAccent", Rgb(0xFF, 0xFF, 0xFF));
 
-        /// <summary>⑤ 亮色浅色：白天办公</summary>
+        /// <summary>⑤ 亮色浅色：白天办公（文字黑色）</summary>
         private static ThemePalette MakeLight() => new ThemePalette("亮色浅色")
             .Set("Bg", Rgb(0xFF, 0xFF, 0xFF))
             .Set("PanelBg", Rgb(0xF5, 0xF5, 0xF5))

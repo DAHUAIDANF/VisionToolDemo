@@ -1,0 +1,25 @@
+<!-- 主题：深蓝灰（默认，原界面配色）。
+     颜色全部定义为 SolidColorBrush 资源，控件用 {DynamicResource Key} 引用；
+     切换主题时 ThemeManager 替换 Application 级 MergedDictionaries 中的主题字典，
+     所有动态引用自动跟随变色。 -->
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="Bg" Color="#1A1E24" />
+    <SolidColorBrush x:Key="PanelBg" Color="#1F242C" />
+    <SolidColorBrush x:Key="CardBg" Color="#333C4B" />
+    <SolidColorBrush x:Key="CardBgHover" Color="#3E4959" />
+    <SolidColorBrush x:Key="NavBg" Color="#12161C" />
+    <SolidColorBrush x:Key="Line" Color="#4A5666" />
+    <SolidColorBrush x:Key="Fg" Color="#F6F9FD" />
+    <SolidColorBrush x:Key="FgDim" Color="#CBD4E0" />
+    <SolidColorBrush x:Key="FgFaint" Color="#B4BFCE" />
+    <SolidColorBrush x:Key="Accent" Color="#4C8DF6" />
+    <SolidColorBrush x:Key="AccentDim" Color="#20304A" />
+    <SolidColorBrush x:Key="Ok" Color="#45DEA8" />
+    <SolidColorBrush x:Key="Warn" Color="#FFC94A" />
+    <SolidColorBrush x:Key="Ng" Color="#FF8A8A" />
+    <SolidColorBrush x:Key="InputBg" Color="#10151B" />
+    <SolidColorBrush x:Key="SelBg" Color="#40506B" />
+    <SolidColorBrush x:Key="CardSubFg" Color="#D3DBE6" />
+    <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF" />
+</ResourceDictionary>

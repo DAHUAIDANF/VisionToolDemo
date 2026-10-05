@@ -3,6 +3,8 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Windows.Input;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using VisionToolDemo.Vision.Automation;
 using VisionToolDemo.Wpf.Mvvm;
 
@@ -66,7 +68,7 @@ namespace VisionToolDemo.Wpf.ViewModels
             {
                 try
                 {
-                    System.Windows.Clipboard.SetText(HelpText.HelpTextPublic ?? "");
+                    Wpf.Ui.CopyToClipboard(HelpText.HelpTextPublic ?? "");
                     StatusRequested?.Invoke("使用说明已复制到剪贴板");
                 }
                 catch { /* 剪贴板被占用等异常忽略 */ }
@@ -163,9 +165,10 @@ namespace VisionToolDemo.Wpf.ViewModels
     }
 
     /// <summary>
-    /// ⑪ 图文手册的一个章节：标题 + 说明 + 界面截图绝对路径。
+    /// ⑪ 图文手册的一个章节：标题 + 说明 + 界面截图。
     /// 图片解析顺序：程序输出目录 docs\img\xx.png → 仓库根 docs\img\xx.png；
     /// 都找不到时 ImagePath 为 null，界面留空但不报错。
+    /// 【Avalonia】Image.Source 只认 IImage，不认字符串路径——这里预加载成 Bitmap。
     /// </summary>
     public sealed class HelpManualSection
     {
@@ -173,11 +176,27 @@ namespace VisionToolDemo.Wpf.ViewModels
         public string Description { get; }
         public string ImagePath { get; }
 
+        /// <summary>Avalonia 可直接显示的位图（解析失败为 null）</summary>
+        public IImage? ImageBitmap { get; }
+
         public HelpManualSection(string title, string description, string imageFile)
         {
             Title = title;
             Description = description;
             ImagePath = ResolveImage(imageFile);
+            ImageBitmap = LoadBitmap(ImagePath);
+        }
+
+        /// <summary>从磁盘路径加载 Avalonia 位图（文件不存在/损坏时返回 null）</summary>
+        private static IImage? LoadBitmap(string path)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(path) || !File.Exists(path)) return null;
+                using var fs = File.OpenRead(path);
+                return new Bitmap(fs);
+            }
+            catch { return null; }
         }
 
         /// <summary>按相对文件名解析图片的绝对路径</summary>
@@ -185,7 +204,7 @@ namespace VisionToolDemo.Wpf.ViewModels
         {
             try
             {
-                // 1) 程序输出目录：bin\Debug\net8.0-windows\docs\img\xx.png
+                // 1) 程序输出目录：bin\Debug\net8.0\docs\img\xx.png
                 string p1 = Path.Combine(AppContext.BaseDirectory, "docs", "img", file);
                 if (File.Exists(p1)) return p1;
                 // 2) 仓库根：向上找含 VisionToolDemo.csproj（或 软件使用.md）的目录
