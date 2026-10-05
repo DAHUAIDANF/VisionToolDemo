@@ -120,14 +120,22 @@ namespace VisionToolDemo.Vision
                             var tpl = DecodeTemplate(step.TemplatePngBase64);
                             if (tpl == null || tpl.Empty())
                             {
-                                row.Ok = false;
-                                row.Summary = "缺少模板图";
-                                error = string.Format("第 {0} 步（{1}）需要模板图，但算子里程里没有", i + 1, step.OpName);
-                                tpl?.Dispose();
-                                return last;
+                                // 可选参考图的算子（枯叶噪声/镜头阴影校正）缺模板不阻断，按自参考方式继续；
+                                // 必需模板的算子（模板匹配/图像拼接等）缺模板直接报错
+                                if (Automation.AutomationSupport.TemplateRequired(task))
+                                {
+                                    row.Ok = false;
+                                    row.Summary = "缺少模板图";
+                                    error = string.Format("第 {0} 步（{1}）需要模板图，但算子里程里没有", i + 1, step.OpName);
+                                    tpl?.Dispose();
+                                    return last;
+                                }
                             }
-                            temps.Add(tpl);
-                            Automation.AutomationSupport.ApplyTemplate(task, tpl);
+                            else
+                            {
+                                temps.Add(tpl);
+                                Automation.AutomationSupport.ApplyTemplate(task, tpl);
+                            }
                         }
 
                         var sw = Stopwatch.StartNew();

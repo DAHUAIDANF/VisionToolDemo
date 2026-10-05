@@ -20,13 +20,28 @@ namespace VisionToolDemo.Vision.Automation
         /// 深度学习相似度：.onnx 特征模型）</summary>
         public static bool NeedsModel(IVisionTask task) => task is DeepLearnTask or DeepSimTask;
 
-        /// <summary>这个算子是否需要模板/参考图</summary>
+        /// <summary>这个算子是否需要模板/参考图（有则显示模板槽；注入模板都走 ApplyTemplate）</summary>
         public static bool NeedsTemplate(IVisionTask task) => task switch
         {
             TemplateMatchTask or TemplateDiffTask or FeatureMatchTask or GeometricLocatorTask
                 or AffineAlignTask or ShapeMatchTask or ForegroundSplitTask or OffsetInspectTask
-                or ImageArithTask or BlendModeTask or InpaintTask => true,
+                or ImageArithTask or BlendModeTask or InpaintTask
+                or ImageStitchTask or DeadLeavesTask or LscTask => true,
             // "等待条件"的模板命中模式也要模板（它自己截图自己匹配）
+            WaitConditionTask => true,
+            _ => false,
+        };
+
+        /// <summary>
+        /// 这个算子的模板/参考图是否**必需**（缺了就不能正确运行，链执行/链文件加载要报错）。
+        /// 与 NeedsTemplate 的差别：枯叶噪声、镜头阴影校正的参考图是可选增强，
+        /// 不传也能按自参考/局部方式运行 —— 所以 NeedsTemplate=true（显示模板槽）但 TemplateRequired=false。
+        /// </summary>
+        public static bool TemplateRequired(IVisionTask task) => task switch
+        {
+            TemplateMatchTask or TemplateDiffTask or FeatureMatchTask or GeometricLocatorTask
+                or AffineAlignTask or ShapeMatchTask or ForegroundSplitTask or OffsetInspectTask
+                or ImageArithTask or BlendModeTask or InpaintTask or ImageStitchTask => true,
             WaitConditionTask => true,
             _ => false,
         };
@@ -48,6 +63,9 @@ namespace VisionToolDemo.Vision.Automation
                 case ImageArithTask t: t.OperandMat = template; return true;
                 case BlendModeTask t: t.TemplateMat = template; return true;
                 case InpaintTask t: t.TemplateMat = template; return true;
+                case ImageStitchTask t: t.TemplateMat = template; return true;   // 图像拼接的第二幅图
+                case DeadLeavesTask t: t.ReferenceMat = template; return true;   // 枯叶噪声参考频谱图（可选）
+                case LscTask t: t.ReferenceMat = template; return true;          // 镜头阴影校正参考图（可选）
                 case WaitConditionTask t: t.TemplateMat = template; return true;
                 default: return false;
             }

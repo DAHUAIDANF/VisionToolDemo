@@ -417,7 +417,7 @@ namespace VisionToolDemo.Wpf.Views
             var task = _editing.Task ??= VisionTaskRegistry.GetTask(_editing.OpName);
             if (task == null || !AutomationSupport.NeedsTemplate(task))
             {
-                Warn(_editing.OpName + " 不需要模板；需要模板的是 模板匹配/模板差分/特征匹配/几何定位/形状匹配 这类算子");
+                Warn(_editing.OpName + " 不需要模板；需要模板的是 模板匹配/模板差分/特征匹配/几何定位/形状匹配/图像拼接 这类算子");
                 return;
             }
             var source = CurrentDisplayMat();
@@ -1266,8 +1266,16 @@ namespace VisionToolDemo.Wpf.Views
                     if (AutomationSupport.NeedsTemplate(task))
                     {
                         if (!MatAlive(step.Template))
-                            throw new InvalidOperationException("这个算子需要模板图，但还没有设（右侧可导入或用图上选区裁）");
-                        AutomationSupport.ApplyTemplate(task, step.Template);
+                        {
+                            // 可选参考图的算子（枯叶噪声/镜头阴影校正）缺模板不阻断；
+                            // 必需模板的算子缺模板才报错，提示右侧导入或图上选区裁
+                            if (AutomationSupport.TemplateRequired(task))
+                                throw new InvalidOperationException("这个算子需要模板图，但还没有设（右侧可导入或用图上选区裁）");
+                        }
+                        else
+                        {
+                            AutomationSupport.ApplyTemplate(task, step.Template);
+                        }
                     }
                     var sw = System.Diagnostics.Stopwatch.StartNew();
                     // 文本参数注入：把链步的文本值写入算子 NodeText（二维码内容等）；
