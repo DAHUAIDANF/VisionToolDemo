@@ -1,0 +1,213 @@
+<UserControl x:Class="VisionToolDemo.Wpf.Views.PipelinePage"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource Bg}" Focusable="True">
+
+        <UserControl.Resources>
+        <ResourceDictionary>
+            <!-- 全局样式与主题色已在 App.axaml 的 Styles/Themes 中提供，页面无需重复引用 -->
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <DockPanel>
+        <Border Classes="card" DockPanel.Dock="Top" Padding="12" Margin="0,0,0,8">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Left" Text="视觉流水线" Classes="pageheader" VerticalAlignment="Center" />
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="主题" Classes="dimtext" VerticalAlignment="Center" Margin="20,0,10,0" />
+                    <Border x:Name="ThemeDot0" Width="24" Height="24" Margin="7,0,0,0" CornerRadius="12" BorderThickness="2"
+                            ToolTip.Tip="深蓝灰（默认）" PointerPressed="ThemeDot_Click" Tag="0" />
+                    <Border x:Name="ThemeDot1" Width="24" Height="24" Margin="7,0,0,0" CornerRadius="12" BorderThickness="2"
+                            ToolTip.Tip="深墨绿" PointerPressed="ThemeDot_Click" Tag="1" />
+                    <Border x:Name="ThemeDot2" Width="24" Height="24" Margin="7,0,0,0" CornerRadius="12" BorderThickness="2"
+                            ToolTip.Tip="深紫罗兰" PointerPressed="ThemeDot_Click" Tag="2" />
+                    <Border x:Name="ThemeDot3" Width="24" Height="24" Margin="7,0,0,0" CornerRadius="12" BorderThickness="2"
+                            ToolTip.Tip="暖橙红" PointerPressed="ThemeDot_Click" Tag="3" />
+                    <Border x:Name="ThemeDot4" Width="24" Height="24" Margin="7,0,0,0" CornerRadius="12" BorderThickness="2"
+                            ToolTip.Tip="亮色浅色" PointerPressed="ThemeDot_Click" Tag="4" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+        <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260" MinWidth="180" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" MinWidth="240" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="392" MinWidth="280" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ============ 算子库 ============ -->
+        <Border Grid.Column="0" Classes="panel" BorderThickness="0,0,1,0">
+            <DockPanel Margin="10">
+                <TextBlock DockPanel.Dock="Top" Text="算子" Classes="sectionheader" />
+                <TextBlock DockPanel.Dock="Top" Classes="fainttext" Margin="0,0,0,6"
+                           Text="双击加入算子链（从下往上依次处理）。" TextWrapping="Wrap" />
+                <TextBox x:Name="OpSearch" DockPanel.Dock="Top" Margin="0,0,0,8" />
+                <ItemsControl x:Name="OpChips" DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+                <ListBox x:Name="OpList"
+                         DoubleTapped="OpList_MouseDoubleClick"
+                         >
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel>
+                                <TextBlock Text="{Binding Title}" Classes="cardtitle" />
+                                <TextBlock Text="{Binding Sub}" Classes="cardsub" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" Background="#2AFFFFFF" ToolTip.Tip="拖动调整栏宽" />
+
+        <!-- ============ 图像（含框选裁模板） ============ -->
+        <Grid Grid.Column="2" Background="{DynamicResource InputBg}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1" Padding="8,6">
+                <DockPanel>
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                        <RadioButton x:Name="TabResult" Content="结果" IsChecked="True" Foreground="{DynamicResource Fg}"
+                                     Margin="0,0,18,0" VerticalAlignment="Center" Command="{Binding SelectTabCommand}" CommandParameter="result" />
+                        <RadioButton x:Name="TabSource" Content="原图" Foreground="{DynamicResource Fg}"
+                                     VerticalAlignment="Center" Command="{Binding SelectTabCommand}" CommandParameter="input" />
+                        <CheckBox x:Name="ChkRoi" Content="用选区做 ROI" Foreground="{DynamicResource Fg}"
+                                  Margin="20,0,0,0" VerticalAlignment="Center"
+                                  ToolTip.Tip="勾上后，整条算子链只在原图上拉的那个框里处理（框外不参与）。&#10;请在「原图」页签上拉框：结果图尺寸常与原图不同（可能只有几十像素）。" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" Margin="18,0,0,0">
+                        <Button x:Name="BtnResetView" Content="重置视图" Classes="flat"
+                                Padding="10,3" VerticalAlignment="Center" ToolTip.Tip="滚轮缩放、中键或右键拖动平移；点这里回到适应窗口"
+                                Command="{Binding ResetViewCommand}" />
+                        <TextBlock x:Name="PixelInfo" Classes="fainttext" Text=""
+                                   VerticalAlignment="Center" Margin="12,0,0,0" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+            <Border Grid.Row="1" ClipToBounds="True" Background="{DynamicResource InputBg}"
+                    DragDrop.AllowDrop="True" DragDrop.DragOver="View_DragOver" DragDrop.Drop="View_Drop">
+                <!-- 图像与覆盖层放在同一个内边距容器里、且都不带 margin：
+                     这样两层的坐标原点**结构上**就是同一个，框选不会因为 margin 对不上而偏移 -->
+                <Grid Margin="8">
+                    <Image x:Name="View" Stretch="Uniform"
+                           HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                           PointerMoved="View_MouseMove" PointerExited="View_MouseLeave"
+                           PointerPressed="View_MouseLeftButtonDown" PointerReleased="View_MouseLeftButtonUp"
+                           PointerWheelChanged="View_MouseWheel" />
+                    <Canvas x:Name="Overlay" IsHitTestVisible="False">
+                        <Rectangle x:Name="Selection" Stroke="{DynamicResource Warn}" StrokeThickness="2"
+                                   Fill="#22FFCC00" IsVisible="False" />
+                        <!-- 卡尺画线临时线：选中直线卡尺/边缘对卡尺后，左键拖动时实时显示（黄），松手注入算子 -->
+                        <Line x:Name="CaliperLine" Stroke="#FFFFAA00" StrokeThickness="3"
+                              IsVisible="False" />
+                        <!-- 圆卡尺临时圆：左键拖动，起点=圆心、拖动距离=半径 -->
+                        <Ellipse x:Name="GeomCircle" Stroke="#FFFFAA00" StrokeThickness="3"
+                                 Fill="#33FFAA00" IsVisible="False" />
+                        <!-- GrabCut 排除框：第二次拖动画排除区域（红虚线），前景框复用 Selection -->
+                        <Rectangle x:Name="GcExclude" Stroke="#FFFF5555" StrokeThickness="2"
+                                   StrokeDashArray="5,3" Fill="#22FF5555" IsVisible="False" />
+                    </Canvas>
+                    <!-- 空状态：没图时居中引导，有图自动隐藏（RenderView 里切换） -->
+                    <Border x:Name="EmptyHint" IsHitTestVisible="False"
+                            HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="&#xE8B9;" FontFamily="{StaticResource IconFont}" FontSize="48"
+                                       Foreground="{DynamicResource FgFaint}" HorizontalAlignment="Center" />
+                            <TextBlock Text="打开图片或把图片拖到这里"
+                                       Classes="dimtext" FontSize="15" Margin="0,12,0,0" HorizontalAlignment="Center" />
+                            <TextBlock Text="在图上拉一个框 → 可存成模板 / 用选区做 ROI"
+                                       Classes="fainttext" FontSize="12" Margin="0,6,0,0" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+            <Border Grid.Row="2" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="8,4">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="ImageViewInfo" Grid.Column="0" Classes="fainttext"
+                               VerticalAlignment="Center" Text="还没有图像" TextTrimming="CharacterEllipsis"
+                               ToolTip.Tip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+                    <TextBlock Grid.Column="1" Classes="fainttext"
+                               VerticalAlignment="Center" Margin="12,0,0,0"
+                               Text="在图上拉一个框 → 可存成模板" />
+                </Grid>
+            </Border>
+        </Grid>
+
+        <GridSplitter Grid.Column="3" Width="4" HorizontalAlignment="Stretch" Background="#2AFFFFFF" ToolTip.Tip="拖动调整栏宽" />
+
+        <!-- ============ 右栏：算子链 + 参数 ============ -->
+        <Border Grid.Column="4" Classes="panel" BorderThickness="1,0,0,0">
+            <Grid Margin="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" MinHeight="120" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" MinHeight="140" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <DockPanel Grid.Row="0">
+                    <TextBlock DockPanel.Dock="Top" Text="算子链" Classes="sectionheader" />
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+                        <Button x:Name="BtnAddStep" Content="加入选中算子" Classes="flat" Command="{Binding AddStepCommand}" />
+                        <Button x:Name="BtnOpenImage" Content="打开图片…" Classes="flat" Margin="8,0,0,0" Command="{Binding OpenImageCommand}" />
+                        <Button x:Name="BtnClearChain" Content="清空链" Classes="flat" Margin="8,0,0,0" Command="{Binding ClearChainCommand}" />
+                    </StackPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
+                        <Button x:Name="BtnUp" Content="上移" Classes="flat" Command="{Binding MoveUpCommand}" />
+                        <Button x:Name="BtnDown" Content="下移" Classes="flat" Margin="8,0,0,0" Command="{Binding MoveDownCommand}" />
+                        <Button x:Name="BtnRemoveStep" Content="移除" Classes="flat" Margin="8,0,0,0" Command="{Binding RemoveStepCommand}" />
+                    </StackPanel>
+                </DockPanel>
+
+                <ListBox x:Name="ChainList" Grid.Row="1" Margin="0,8,0,0"
+                         SelectionChanged="ChainList_SelectionChanged"
+                         >
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel>
+                                <TextBlock Text="{Binding Title}" Classes="cardtitle" />
+                                <TextBlock Text="{Binding Sub}" Classes="cardsub" TextWrapping="Wrap" TextTrimming="None" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <GridSplitter Grid.Row="2" Height="4" HorizontalAlignment="Stretch" Margin="0,6,0,0" Background="#2AFFFFFF" ToolTip.Tip="拖动调整上下区域" />
+
+                <!-- 参数区：模板卡片与参数放在同一个滚动区。
+                     之前模板卡片（含缩略图）单独钉在顶部，会把参数 ScrollViewer 挤出可视区，
+                     导入模板后就看不到下面的参数。现在两者整体滚动，参数永远可见。 -->
+                <DockPanel Grid.Row="3">
+                    <TextBlock DockPanel.Dock="Top" Text="当前算子参数" Classes="sectionheader" />
+                    <TextBlock x:Name="OpTitle" DockPanel.Dock="Top" Classes="dimtext" Margin="0,0,0,6" TextWrapping="Wrap" />
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel>
+                            <StackPanel x:Name="TemplateHost" />
+                            <StackPanel x:Name="ModelHost" />
+                            <StackPanel x:Name="TrackHost" />
+                            <StackPanel x:Name="ParamHost" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+
+                <StackPanel Grid.Row="4" Margin="0,8,0,0">
+                    <Button x:Name="BtnRun" Content="运行整条链" Classes="flat primary" Command="{Binding RunChainCommand}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+    </DockPanel>
+</UserControl>

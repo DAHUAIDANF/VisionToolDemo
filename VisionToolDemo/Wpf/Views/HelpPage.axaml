@@ -1,0 +1,343 @@
+<UserControl x:Class="VisionToolDemo.Wpf.Views.HelpPage"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource Bg}">
+
+    <DockPanel Margin="16">
+        <TextBlock DockPanel.Dock="Top" Text="使用说明" Classes="pageheader" Margin="0,0,0,8" />
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
+            <Button x:Name="BtnCopy" Content="复制全部" Classes="flat" Command="{Binding CopyCommand}" />
+            <TextBlock x:Name="Hint" Classes="fainttext" VerticalAlignment="Center" Margin="12,0,0,0"
+                       Text="图文使用说明（完整文字在最下方「详细说明」，可一键复制）" />
+        </StackPanel>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="0,0,4,0">
+
+                <!-- ============ ① 基本流程 ============ -->
+                <Border Classes="card" Margin="0,0,0,12">
+                    <StackPanel Margin="12">
+                        <TextBlock Text="① 基本流程" Classes="cardtitle" />
+                        <TextBlock Classes="dimtext" TextWrapping="Wrap" Margin="0,4,0,8"
+                                   Text="打开图像 → 选算子调参 → 画 ROI / 手势操作 → 实时看结果 → 保存。图像支持 JPG / PNG / BMP / RAW（裸 RAW 会弹参数框填宽高、位深等，16 位自动归一化，Bayer 自动去马赛克）。" />
+                        <Viewbox Stretch="Uniform" HorizontalAlignment="Stretch" Margin="0,4,0,0">
+                            <Canvas Width="640" Height="118">
+                                <!-- 五个流程步骤块 -->
+                                <Rectangle Canvas.Left="6" Canvas.Top="18" Width="104" Height="44" RadiusX="8" RadiusY="8" Fill="#232A32" Stroke="#3A4552" StrokeThickness="1" />
+                                <TextBlock Canvas.Left="16" Canvas.Top="31" Foreground="#C9D3DC" FontSize="13" Text="打开图像" />
+                                <Rectangle Canvas.Left="128" Canvas.Top="18" Width="104" Height="44" RadiusX="8" RadiusY="8" Fill="#232A32" Stroke="#3A4552" StrokeThickness="1" />
+                                <TextBlock Canvas.Left="138" Canvas.Top="31" Foreground="#C9D3DC" FontSize="13" Text="选算子调参" />
+                                <Rectangle Canvas.Left="250" Canvas.Top="18" Width="104" Height="44" RadiusX="8" RadiusY="8" Fill="#232A32" Stroke="#3A4552" StrokeThickness="1" />
+                                <TextBlock Canvas.Left="260" Canvas.Top="31" Foreground="#C9D3DC" FontSize="13" Text="画ROI/手势" />
+                                <Rectangle Canvas.Left="372" Canvas.Top="18" Width="104" Height="44" RadiusX="8" RadiusY="8" Fill="#232A32" Stroke="#3A4552" StrokeThickness="1" />
+                                <TextBlock Canvas.Left="382" Canvas.Top="31" Foreground="#C9D3DC" FontSize="13" Text="实时看结果" />
+                                <Rectangle Canvas.Left="494" Canvas.Top="18" Width="104" Height="44" RadiusX="8" RadiusY="8" Fill="#2E3B2A" Stroke="#4A7A42" StrokeThickness="1" />
+                                <TextBlock Canvas.Left="504" Canvas.Top="31" Foreground="#C9D3DC" FontSize="13" Text="保存结果" />
+                                <!-- 步骤间箭头 -->
+                                <Path Data="M 114 40 L 124 40" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 124 40 L 120 36 M 124 40 L 120 44" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 236 40 L 246 40" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 246 40 L 242 36 M 246 40 L 242 44" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 358 40 L 368 40" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 368 40 L 364 36 M 368 40 L 364 44" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 480 40 L 490 40" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 490 40 L 486 36 M 490 40 L 486 44" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <!-- 底部说明 -->
+                                <TextBlock Canvas.Left="6" Canvas.Top="82" Foreground="#6B7686" FontSize="12"
+                                           Text="注：正在查看流水线某步中间图时，「保存结果」保存的是该步输出。" />
+                            </Canvas>
+                        </Viewbox>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ ② 视觉流水线 ============ -->
+                <Border Classes="card" Margin="0,0,0,12">
+                    <StackPanel Margin="12">
+                        <TextBlock Text="② 视觉流水线（算子链）" Classes="cardtitle" />
+                        <TextBlock Classes="dimtext" TextWrapping="Wrap" Margin="0,4,0,8"
+                                   Text="按顺序添加多个算子串成一条链：输入图像依次经过每一步，右侧实时显示当前步骤的输出。可随时插入、排序、禁用、复制、双击编辑。" />
+                        <Viewbox Stretch="Uniform" HorizontalAlignment="Stretch" Margin="0,4,0,0">
+                            <Canvas Width="640" Height="128">
+                                <Rectangle Canvas.Left="6" Canvas.Top="14" Width="86" Height="42" RadiusX="8" RadiusY="8" Fill="#232A32" Stroke="#3A4552" StrokeThickness="1" />
+                                <TextBlock Canvas.Left="16" Canvas.Top="28" Foreground="#C9D3DC" FontSize="13" Text="输入图像" />
+                                <Rectangle Canvas.Left="108" Canvas.Top="14" Width="86" Height="42" RadiusX="8" RadiusY="8" Fill="#23303C" Stroke="#4CC2FF" StrokeThickness="1.5" />
+                                <TextBlock Canvas.Left="116" Canvas.Top="28" Foreground="#C9D3DC" FontSize="13" Text="步骤1 灰度" />
+                                <Rectangle Canvas.Left="210" Canvas.Top="14" Width="86" Height="42" RadiusX="8" RadiusY="8" Fill="#23303C" Stroke="#4CC2FF" StrokeThickness="1.5" />
+                                <TextBlock Canvas.Left="218" Canvas.Top="28" Foreground="#C9D3DC" FontSize="13" Text="步骤2 二值化" />
+                                <Rectangle Canvas.Left="312" Canvas.Top="14" Width="86" Height="42" RadiusX="8" RadiusY="8" Fill="#23303C" Stroke="#4CC2FF" StrokeThickness="1.5" />
+                                <TextBlock Canvas.Left="320" Canvas.Top="28" Foreground="#C9D3DC" FontSize="13" Text="步骤3 找轮廓" />
+                                <Rectangle Canvas.Left="414" Canvas.Top="14" Width="86" Height="42" RadiusX="8" RadiusY="8" Fill="#2E3B2A" Stroke="#4A7A42" StrokeThickness="1" />
+                                <TextBlock Canvas.Left="424" Canvas.Top="28" Foreground="#C9D3DC" FontSize="13" Text="输出结果" />
+                                <Path Data="M 96 35 L 104 35" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 104 35 L 100 31 M 104 35 L 100 39" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 198 35 L 206 35" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 206 35 L 202 31 M 206 35 L 202 39" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 300 35 L 308 35" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 308 35 L 304 31 M 308 35 L 304 39" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 402 35 L 410 35" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 410 35 L 406 31 M 410 35 L 406 39" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <!-- 常用操作提示 -->
+                                <TextBlock Canvas.Left="6" Canvas.Top="72" Foreground="#6B7686" FontSize="12" Text="· 添加步骤(选中后插入)：未选中=追加末尾，选中=插到它后面" />
+                                <TextBlock Canvas.Left="6" Canvas.Top="90" Foreground="#6B7686" FontSize="12" Text="· ↑/↓ 调整顺序 · 右键列表：禁用/启用(显示[停])、复制该步骤 · 双击步骤：编辑参数并实时写回" />
+                                <TextBlock Canvas.Left="6" Canvas.Top="108" Foreground="#6B7686" FontSize="12" Text="· 单击步骤：左图=该步输入，右图=该步输出 · ▶ 运行流水线：顺序执行并弹窗汇总耗时" />
+                            </Canvas>
+                        </Viewbox>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ ③ ROI 框选与查看 ============ -->
+                <Border Classes="card" Margin="0,0,0,12">
+                    <StackPanel Margin="12">
+                        <TextBlock Text="③ ROI 框选与图像查看" Classes="cardtitle" />
+                        <TextBlock Classes="dimtext" TextWrapping="Wrap" Margin="0,4,0,8"
+                                   Text="在左图上按住拖动画红色框＝只处理框内区域，结果写回原图框内位置；「清空ROI」恢复整图。滚轮缩放（以光标为中心），放大后原图用中键/右键拖动平移，结果图用左键拖动。" />
+                        <Viewbox Stretch="Uniform" HorizontalAlignment="Stretch" Margin="0,4,0,0">
+                            <Canvas Width="640" Height="132">
+                                <!-- 左：原图带 ROI 框 -->
+                                <Rectangle Canvas.Left="10" Canvas.Top="12" Width="190" Height="96" Fill="#1A222A" Stroke="#3A4552" StrokeThickness="1.5" />
+                                <Rectangle Canvas.Left="46" Canvas.Top="30" Width="96" Height="56" Fill="#2A3A2E" Stroke="#F5C044" StrokeThickness="1.5" StrokeDashArray="5,3" />
+                                <TextBlock Canvas.Left="16" Canvas.Top="96" Foreground="#C9D3DC" FontSize="12" Text="左图：按住拖动画 ROI 框" />
+                                <!-- 箭头 -->
+                                <Path Data="M 212 60 L 244 60" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 244 60 L 240 56 M 244 60 L 240 64" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <TextBlock Canvas.Left="216" Canvas.Top="66" Foreground="#6B7686" FontSize="11" Text="处理" />
+                                <!-- 右：只处理框内，结果写回 -->
+                                <Rectangle Canvas.Left="258" Canvas.Top="12" Width="190" Height="96" Fill="#1A222A" Stroke="#3A4552" StrokeThickness="1.5" />
+                                <Rectangle Canvas.Left="286" Canvas.Top="26" Width="72" Height="40" Fill="#3A4A3A" Stroke="#4CC2FF" StrokeThickness="1.5" />
+                                <TextBlock Canvas.Left="264" Canvas.Top="96" Foreground="#C9D3DC" FontSize="12" Text="结果图：只处理框内、写回原位" />
+                                <!-- 查看提示 -->
+                                <TextBlock Canvas.Left="468" Canvas.Top="20" Foreground="#6B7686" FontSize="12" Text="· 滚轮缩放（光标为中心）" />
+                                <TextBlock Canvas.Left="468" Canvas.Top="42" Foreground="#6B7686" FontSize="12" Text="· 缩到最小自动回到适应窗口" />
+                                <TextBlock Canvas.Left="468" Canvas.Top="64" Foreground="#6B7686" FontSize="12" Text="· 原图：中键/右键拖动平移" />
+                                <TextBlock Canvas.Left="468" Canvas.Top="86" Foreground="#6B7686" FontSize="12" Text="· 结果图：左键拖动平移" />
+                                <TextBlock Canvas.Left="468" Canvas.Top="108" Foreground="#6B7686" FontSize="12" Text="· 处理摘要显示在右上提示标签" />
+                            </Canvas>
+                        </Viewbox>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ ④ 特殊手势算子 ============ -->
+                <Border Classes="card" Margin="0,0,0,12">
+                    <StackPanel Margin="12">
+                        <TextBlock Text="④ 特殊手势算子（在左图上直接画）" Classes="cardtitle" />
+                        <TextBlock Classes="dimtext" TextWrapping="Wrap" Margin="0,4,0,8"
+                                   Text="卡尺 / 测量类算子在左图上用手势指定位置与范围，再运行算子链（当前画完即生效）。" />
+                        <Viewbox Stretch="Uniform" HorizontalAlignment="Stretch" Margin="0,4,0,0">
+                            <Canvas Width="640" Height="128">
+                                <!-- 直线卡尺 -->
+                                <Rectangle Canvas.Left="8" Canvas.Top="10" Width="196" Height="100" Fill="#1A222A" Stroke="#3A4552" StrokeThickness="1.5" />
+                                <Line StartPoint="70,20" EndPoint="70,96" Stroke="#F5C044" StrokeThickness="3" />
+                                <Line StartPoint="40,30" EndPoint="100,30" Stroke="#F5C044" StrokeThickness="2" StrokeDashArray="4,3" />
+                                <Line StartPoint="40,88" EndPoint="100,88" Stroke="#F5C044" StrokeThickness="2" StrokeDashArray="4,3" />
+                                <TextBlock Canvas.Left="110" Canvas.Top="24" Foreground="#C9D3DC" FontSize="12" Text="直线卡尺" />
+                                <TextBlock Canvas.Left="110" Canvas.Top="44" Foreground="#6B7686" FontSize="11" Text="拖画扫描线" />
+                                <TextBlock Canvas.Left="110" Canvas.Top="60" Foreground="#6B7686" FontSize="11" Text="黄色带内搜上升/下降沿" />
+                                <!-- 圆卡尺 -->
+                                <Rectangle Canvas.Left="222" Canvas.Top="10" Width="196" Height="100" Fill="#1A222A" Stroke="#3A4552" StrokeThickness="1.5" />
+                                <Ellipse Canvas.Left="296" Canvas.Top="36" Width="66" Height="66" Stroke="#F5C044" StrokeThickness="3" />
+                                <Ellipse Canvas.Left="323" Canvas.Top="63" Width="12" Height="12" Fill="#F5C044" />
+                                <TextBlock Canvas.Left="300" Canvas.Top="14" Foreground="#C9D3DC" FontSize="12" Text="圆卡尺" />
+                                <TextBlock Canvas.Left="300" Canvas.Top="30" Foreground="#6B7686" FontSize="11" Text="起点=圆心，拖动距离=半径" />
+                                <!-- 点到直线 -->
+                                <Rectangle Canvas.Left="436" Canvas.Top="10" Width="196" Height="100" Fill="#1A222A" Stroke="#3A4552" StrokeThickness="1.5" />
+                                <Line StartPoint="452,88" EndPoint="600,24" Stroke="#F5C044" StrokeThickness="2.5" />
+                                <Ellipse Canvas.Left="556" Canvas.Top="66" Width="10" Height="10" Fill="#4CC2FF" />
+                                <Line StartPoint="561,71" EndPoint="528,60" Stroke="#4CC2FF" StrokeThickness="1.5" StrokeDashArray="3,2" />
+                                <TextBlock Canvas.Left="448" Canvas.Top="14" Foreground="#C9D3DC" FontSize="12" Text="点到直线 / 直线间距" />
+                                <TextBlock Canvas.Left="448" Canvas.Top="30" Foreground="#6B7686" FontSize="11" Text="第1次画线，第2次点测量点" />
+                                <TextBlock Canvas.Left="448" Canvas.Top="46" Foreground="#6B7686" FontSize="11" Text="两线：画两条线比平行/间距" />
+                            </Canvas>
+                        </Viewbox>
+                        <TextBlock Classes="dimtext" TextWrapping="Wrap" Margin="0,8,0,0"
+                                   Text="掩膜：模式1/2 拖画红框（矩形/内切圆）涂黑；模式3 按住左键自由涂抹（「笔刷线宽」调粗细，可分多笔）。模板匹配 / 差分 / 特征匹配 / 几何定位：先点「导入模板」载入小图再运行。" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ ⑤ 自动化（工作流节点） ============ -->
+                <Border Classes="card" Margin="0,0,0,12">
+                    <StackPanel Margin="12">
+                        <TextBlock Text="⑤ 自动化（工作流节点）" Classes="cardtitle" />
+                        <TextBlock Classes="dimtext" TextWrapping="Wrap" Margin="0,4,0,8"
+                                   Text="让软件自己抓屏 → 视觉算子判断 → 操作鼠标键盘。⚠ 会真实操作鼠标键盘：默认勾选「干跑」只写日志不动鼠标；核对日志后再取消勾选真实执行；执行中把鼠标甩到屏幕任意角落可立即中止。" />
+                        <Viewbox Stretch="Uniform" HorizontalAlignment="Stretch" Margin="0,4,0,0">
+                            <Canvas Width="640" Height="140">
+                                <!-- 节点块横排 -->
+                                <Rectangle Canvas.Left="6" Canvas.Top="18" Width="96" Height="42" RadiusX="8" RadiusY="8" Fill="#232A32" Stroke="#3A4552" StrokeThickness="1" />
+                                <TextBlock Canvas.Left="14" Canvas.Top="32" Foreground="#C9D3DC" FontSize="12" Text="全局变量" />
+                                <Rectangle Canvas.Left="120" Canvas.Top="18" Width="96" Height="42" RadiusX="8" RadiusY="8" Fill="#23303C" Stroke="#F5C044" StrokeThickness="1.5" />
+                                <TextBlock Canvas.Left="128" Canvas.Top="32" Foreground="#C9D3DC" FontSize="12" Text="条件（是/否）" />
+                                <Rectangle Canvas.Left="234" Canvas.Top="18" Width="96" Height="42" RadiusX="8" RadiusY="8" Fill="#23303C" Stroke="#4CC2FF" StrokeThickness="1.5" />
+                                <TextBlock Canvas.Left="242" Canvas.Top="32" Foreground="#C9D3DC" FontSize="12" Text="循环（完/回）" />
+                                <Rectangle Canvas.Left="348" Canvas.Top="18" Width="96" Height="42" RadiusX="8" RadiusY="8" Fill="#2E3B2A" Stroke="#4A7A42" StrokeThickness="1" />
+                                <TextBlock Canvas.Left="356" Canvas.Top="32" Foreground="#C9D3DC" FontSize="12" Text="弹窗提示" />
+                                <Rectangle Canvas.Left="462" Canvas.Top="18" Width="96" Height="42" RadiusX="8" RadiusY="8" Fill="#232A32" Stroke="#3A4552" StrokeThickness="1" />
+                                <TextBlock Canvas.Left="470" Canvas.Top="32" Foreground="#C9D3DC" FontSize="12" Text="鼠标点击" />
+                                <!-- 主连线 -->
+                                <Path Data="M 106 39 L 116 39" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 116 39 L 112 35 M 116 39 L 112 43" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 220 39 L 230 39" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 230 39 L 226 35 M 230 39 L 226 43" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 334 39 L 344 39" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 344 39 L 340 35 M 344 39 L 340 43" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 448 39 L 458 39" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 458 39 L 454 35 M 458 39 L 454 43" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <!-- 双出口示意（条件） -->
+                                <Path Data="M 168 60 L 168 88" Stroke="#8AA0B2" StrokeThickness="1.5" />
+                                <Path Data="M 168 88 L 128 112" Stroke="#8AA0B2" StrokeThickness="1.5" />
+                                <Path Data="M 168 88 L 208 112" Stroke="#8AA0B2" StrokeThickness="1.5" />
+                                <TextBlock Canvas.Left="96" Canvas.Top="100" Foreground="#6B7686" FontSize="11" Text="上「是」" />
+                                <TextBlock Canvas.Left="204" Canvas.Top="100" Foreground="#6B7686" FontSize="11" Text="下「否」" />
+                                <!-- 底部安全提示 -->
+                                <TextBlock Canvas.Left="6" Canvas.Top="122" Foreground="#6B7686" FontSize="12"
+                                           Text="· 右键画布添加节点 / 双击启用禁用 / Delete 删除 · 节点：截图、匹配、条件、点击、键盘、延时、循环、弹窗、全局变量、OCR、视觉算子、结束" />
+                            </Canvas>
+                        </Viewbox>
+                        <TextBlock Classes="dimtext" TextWrapping="Wrap" Margin="0,8,0,0"
+                                   Text="全局变量把本轮信息记下来，任何文本可用 {变量名} 引用（如 {订单号}、目录 D:\截图\{日期}）；条件/循环/点击节点可直接吃全局变量。屏幕截图节点「保存图片=1」可自动存图（带毫秒时间戳）。" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ ⑥ 深度学习与目标跟踪 ============ -->
+                <Border Classes="card" Margin="0,0,0,12">
+                    <StackPanel Margin="12">
+                        <TextBlock Text="⑥ 深度学习与目标跟踪" Classes="cardtitle" />
+                        <TextBlock Classes="dimtext" TextWrapping="Wrap" Margin="0,4,0,8"
+                                   Text="训练页用少量图片训练分类/检测模型（纯 C#，开源可商用）并导出模型文件；视觉页「深度学习推理」算子加载模型识别，结果图上圈出目标并显示坐标。「目标跟踪」算子可打开视频或摄像头，框选目标后实时跟随。" />
+                        <Viewbox Stretch="Uniform" HorizontalAlignment="Stretch" Margin="0,4,0,0">
+                            <Canvas Width="640" Height="116">
+                                <!-- 训练 → 导出 → 推理 -->
+                                <Rectangle Canvas.Left="6" Canvas.Top="16" Width="104" Height="40" RadiusX="8" RadiusY="8" Fill="#232A32" Stroke="#3A4552" StrokeThickness="1" />
+                                <TextBlock Canvas.Left="16" Canvas.Top="29" Foreground="#C9D3DC" FontSize="12" Text="准备训练集" />
+                                <Rectangle Canvas.Left="126" Canvas.Top="16" Width="104" Height="40" RadiusX="8" RadiusY="8" Fill="#232A32" Stroke="#3A4552" StrokeThickness="1" />
+                                <TextBlock Canvas.Left="136" Canvas.Top="29" Foreground="#C9D3DC" FontSize="12" Text="训练模型" />
+                                <Rectangle Canvas.Left="246" Canvas.Top="16" Width="104" Height="40" RadiusX="8" RadiusY="8" Fill="#2E3B2A" Stroke="#4A7A42" StrokeThickness="1" />
+                                <TextBlock Canvas.Left="256" Canvas.Top="29" Foreground="#C9D3DC" FontSize="12" Text="导出模型" />
+                                <Rectangle Canvas.Left="366" Canvas.Top="16" Width="126" Height="40" RadiusX="8" RadiusY="8" Fill="#23303C" Stroke="#4CC2FF" StrokeThickness="1.5" />
+                                <TextBlock Canvas.Left="376" Canvas.Top="29" Foreground="#C9D3DC" FontSize="12" Text="推理：圈选+坐标" />
+                                <Path Data="M 114 36 L 122 36" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 122 36 L 118 32 M 122 36 L 118 40" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 234 36 L 242 36" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 242 36 L 238 32 M 242 36 L 238 40" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 354 36 L 362 36" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 362 36 L 358 32 M 362 36 L 358 40" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <!-- 目标跟踪示意 -->
+                                <TextBlock Canvas.Left="6" Canvas.Top="70" Foreground="#C9D3DC" FontSize="12" Text="目标跟踪：视频 / 摄像头" />
+                                <Rectangle Canvas.Left="152" Canvas.Top="74" Width="86" Height="34" Fill="#1A222A" Stroke="#3A4552" StrokeThickness="1.5" />
+                                <Rectangle Canvas.Left="170" Canvas.Top="80" Width="40" Height="22" Fill="#2A3A2E" Stroke="#F5C044" StrokeThickness="1.5" />
+                                <TextBlock Canvas.Left="242" Canvas.Top="86" Foreground="#6B7686" FontSize="12" Text="框选目标" />
+                                <Path Data="M 296 91 L 320 91" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Path Data="M 320 91 L 316 87 M 320 91 L 316 95" Stroke="#8AA0B2" StrokeThickness="2" />
+                                <Rectangle Canvas.Left="330" Canvas.Top="74" Width="86" Height="34" Fill="#1A222A" Stroke="#3A4552" StrokeThickness="1.5" />
+                                <Rectangle Canvas.Left="346" Canvas.Top="80" Width="40" Height="22" Fill="#23303C" Stroke="#4CC2FF" StrokeThickness="1.5" />
+                                <TextBlock Canvas.Left="420" Canvas.Top="86" Foreground="#6B7686" FontSize="12" Text="实时跟随（KCF/CSRT/MIL）" />
+                            </Canvas>
+                        </Viewbox>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ ⑦ 全部视觉算子一览（动态枚举） ============ -->
+                <Border Classes="card" Margin="0,0,0,12">
+                    <StackPanel Margin="12">
+                        <TextBlock Text="⑦ 全部视觉算子一览" Classes="cardtitle" />
+                        <TextBlock x:Name="OpCount" Classes="dimtext" Margin="0,4,0,0" Text="{Binding OpCountText}" />
+                        <ItemsControl ItemsSource="{Binding OperatorGroups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Category}" Classes="sectionheader" Margin="0,8,0,2" />
+                                        <ItemsControl ItemsSource="{Binding Items}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding Text}" Classes="dimtext"
+                                                               TextWrapping="Wrap" FontSize="12" Margin="0,1,0,1" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ ⑧ 全部自动化节点一览（动态枚举） ============ -->
+                <Border Classes="card" Margin="0,0,0,12">
+                    <StackPanel Margin="12">
+                        <TextBlock Text="⑧ 全部自动化节点一览" Classes="cardtitle" />
+                        <TextBlock x:Name="NodeCount" Classes="dimtext" Margin="0,4,0,0" Text="{Binding NodeCountText}" />
+                        <ItemsControl ItemsSource="{Binding NodeGroups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Category}" Classes="sectionheader" Margin="0,8,0,2" />
+                                        <ItemsControl ItemsSource="{Binding Items}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding Text}" Classes="dimtext"
+                                                               TextWrapping="Wrap" FontSize="12" Margin="0,1,0,1" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ ⑨ 深度学习训练步骤 ============ -->
+                <Border Classes="card" Margin="0,0,0,12">
+                    <StackPanel Margin="12">
+                        <TextBlock Text="⑨ 深度学习训练步骤" Classes="cardtitle" />
+                        <TextBlock Classes="dimtext" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Text="训练页（左侧导航「训练」）的完整流程：准备小样本训练集 → 设置参数 → 训练 / 验证 / 导出模型 → 在视觉页接入「深度学习推理」算子使用。" />
+                        <TextBlock Classes="sectionheader" Margin="0,10,0,2" Text="1. 选择训练集目录" />
+                        <TextBlock Classes="dimtext" TextWrapping="Wrap"
+                                   Text="训练集目录下每个子文件夹为一个类别，子文件夹名即类别名（建议英文/数字）。支持 .png/.jpg/.jpeg/.bmp/.webp；每类至少 2 张，小样本（每类 50~200 张）效果最佳。" />
+                        <TextBlock Classes="sectionheader" Margin="0,10,0,2" Text="2. 训练参数" />
+                        <TextBlock Classes="dimtext" TextWrapping="Wrap"
+                                   Text="输入边长（图像统一缩放到 S×S，如 32）、训练轮数、学习率、批次大小；「固定种子」可复现训练结果。" />
+                        <TextBlock Classes="sectionheader" Margin="0,10,0,2" Text="3. 训练 / 验证 / 导出" />
+                        <TextBlock Classes="dimtext" TextWrapping="Wrap"
+                                   Text="点「开始训练」训练模型（纯 C# CNN，开源可商用）→「验证一张图…」在训练集外抽查效果 →「导出 ONNX…」导出模型文件 + 同目录 labels.txt。" />
+                        <TextBlock Classes="sectionheader" Margin="0,10,0,2" Text="4. 接入「深度学习推理」算子" />
+                        <TextBlock Classes="dimtext" TextWrapping="Wrap"
+                                   Text="在「视觉」页添加「深度学习推理」算子：任务类型选 0=分类；模型文件选导出的 .onnx；标签文件选同目录 labels.txt；输入边长与训练时一致（如 32）。模型输入为 RGB 浮点 [1,3,S,S]，输出为各类别 logits，推理端自动做 softmax，结果图上圈出识别区域并显示坐标。" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ ⑩ 详细说明（完整文字） ============ -->
+                <Border Classes="card" Margin="0,0,0,12">
+                    <StackPanel Margin="12">
+                        <TextBlock Text="⑩ 详细说明（完整文字）" Classes="cardtitle" />
+                        <TextBlock x:Name="Body" Classes="dimtext" TextWrapping="Wrap" Margin="0,6,0,0"
+                                   FontFamily="{StaticResource MonoFont}" FontSize="12" Text="{Binding BodyText}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ ⑪ 软件使用图文手册（完整版） ============ -->
+                <Border Classes="card" Margin="0,0,0,4">
+                    <StackPanel Margin="12">
+                        <TextBlock Text="⑪ 软件使用图文手册（完整版）" Classes="cardtitle" />
+                        <TextBlock Classes="dimtext" TextWrapping="Wrap" Margin="0,4,0,8"
+                                   Text="与《软件使用.md》同源的图文完整版：每个功能配真实界面截图（16 张，随程序输出到 docs\img 目录，发布后离线可看）。" />
+                        <ItemsControl ItemsSource="{Binding ManualSections}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,6,0,10">
+                                        <TextBlock Text="{Binding Title}" Classes="sectionheader" />
+                                        <TextBlock Text="{Binding Description}" Classes="dimtext"
+                                                   TextWrapping="Wrap" Margin="0,2,0,6" />
+                                        <Image Source="{Binding ImageBitmap}" Stretch="Uniform" MaxHeight="520"
+                                               HorizontalAlignment="Center" Margin="0,2,0,8" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

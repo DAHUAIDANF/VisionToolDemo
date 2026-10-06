@@ -1,0 +1,47 @@
+<!-- 设置与自检页（Avalonia 版）：MVVM 结构不变，数据与命令在 SettingsViewModel，
+     视图只做主题卡片构建与报告滚动。颜色全部 DynamicResource 随主题。 -->
+<UserControl x:Class="VisionToolDemo.Wpf.Views.SettingsPage"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource Bg}">
+
+    <ScrollViewer>
+        <StackPanel Margin="18" MaxWidth="980" HorizontalAlignment="Left">
+            <TextBlock Text="设置" Classes="pageheader" Margin="0,0,0,10" />
+            <TextBlock Text="显示与坐标" Classes="sectionheader" />
+            <Border Classes="card" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock x:Name="DisplayInfo" Classes="dimtext" Text="{Binding InfoText}" />
+                    <TextBlock Classes="fainttext" Margin="0,8,0,0"
+                               Text="界面用矢量渲染 + 自动布局：任意分辨率都不会挤压，125%/150% 缩放下文字与控件按 DPI 等比放大，不发虚。程序按 DPI 感知声明运行，跨屏拖动自动适配（Avalonia 跨 Windows/Linux）。" />
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="界面主题" Classes="sectionheader" />
+            <Border Classes="card" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock x:Name="ThemeHint" Classes="dimtext" Margin="0,0,0,10"
+                               Text="切换界面配色，点击立即生效并自动保存（下次启动保持）。" />
+                    <WrapPanel x:Name="ThemeHost" />
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="自检（出问题时先跑这两个）" Classes="sectionheader" />
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,10" Spacing="8">
+                <Button x:Name="BtnCoordTest" Content="坐标系自检（截图 vs 屏幕）" Classes="flat primary" Command="{Binding CoordTestCommand}" />
+                <Button x:Name="BtnMouseTest" Content="鼠标定位自检" Classes="flat" Command="{Binding MouseTestCommand}" />
+                <Button x:Name="BtnClipboard" Content="复制报告" Classes="flat" Command="{Binding ClipboardCommand}" />
+            </StackPanel>
+            <TextBox x:Name="Report" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                     Height="300" FontFamily="{StaticResource MonoFont}" Background="{DynamicResource InputBg}"
+                     Margin="0,0,0,14" Text="{Binding ReportText}" />
+
+            <TextBlock Text="目录" Classes="sectionheader" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button x:Name="BtnShotDir" Content="打开截图目录" Classes="flat" Command="{Binding OpenShotDirCommand}" />
+                <Button x:Name="BtnRecDir" Content="打开运行记录目录" Classes="flat" Command="{Binding OpenRecDirCommand}" />
+            </StackPanel>
+            <TextBlock x:Name="DirInfo" Classes="fainttext" Margin="0,10,0,0" Text="{Binding DirInfoText}" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
