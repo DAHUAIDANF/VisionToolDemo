@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Shell;
@@ -204,6 +205,29 @@ namespace VisionToolDemo.Wpf
             (page as IShellPage)?.OnShown(this);
             _vm.Status = "已切换到：" + _vm.Title;
             ThemeManager.RegisterPage(this);
+            SyncNavHighlight(key);
+        }
+
+        /// <summary>
+        /// 导航高亮与实际页面同步：软件刚打开时默认页面是「视觉」（pipeline），
+        /// 但 XAML 里若写死某个按钮 IsChecked 会高亮错位。这里按当前页面 key
+        /// 点亮对应导航按钮（RadioButton 互斥，天然保证只有一个高亮）。
+        /// </summary>
+        private void SyncNavHighlight(string key)
+        {
+            var map = new Dictionary<string, RadioButton>
+            {
+                ["automation"] = NavAutomation,
+                ["pipeline"] = NavPipeline,
+                ["capture"] = NavCapture,
+                ["catalog"] = NavCatalog,
+                ["history"] = NavHistory,
+                ["help"] = NavHelp,
+                ["train"] = NavTrain,
+                ["settings"] = NavSettings,
+            };
+            if (map.TryGetValue(key, out var rb))
+                rb.IsChecked = true;
         }
 
         /// <summary>窗口动作：最小化 / 最大化还原 / 关闭（标题栏系统按钮）</summary>
