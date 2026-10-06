@@ -26,7 +26,8 @@ namespace VisionToolDemo.Vision.Automation
             TemplateMatchTask or TemplateDiffTask or FeatureMatchTask or GeometricLocatorTask
                 or AffineAlignTask or ShapeMatchTask or ForegroundSplitTask or OffsetInspectTask
                 or ImageArithTask or BlendModeTask or InpaintTask
-                or ImageStitchTask or DeadLeavesTask or LscTask => true,
+                or ImageStitchTask or DeadLeavesTask or LscTask
+                or ImageAlignTask or HistMatchTask => true,
             // "等待条件"的模板命中模式也要模板（它自己截图自己匹配）
             WaitConditionTask => true,
             _ => false,
@@ -41,7 +42,8 @@ namespace VisionToolDemo.Vision.Automation
         {
             TemplateMatchTask or TemplateDiffTask or FeatureMatchTask or GeometricLocatorTask
                 or AffineAlignTask or ShapeMatchTask or ForegroundSplitTask or OffsetInspectTask
-                or ImageArithTask or BlendModeTask or InpaintTask or ImageStitchTask => true,
+                or ImageArithTask or BlendModeTask or InpaintTask or ImageStitchTask
+                or ImageAlignTask or HistMatchTask => true,
             WaitConditionTask => true,
             _ => false,
         };
