@@ -9,15 +9,7 @@
                 <ResourceDictionary Source="/VisionToolDemo;component/Wpf/Styles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- 通用下拉样式：背景/文字/边框跟随主题 -->
-            <Style x:Key="Cmb" TargetType="{x:Type ComboBox}">
-                <Setter Property="Height" Value="30" />
-                <Setter Property="FontSize" Value="13" />
-                <Setter Property="VerticalContentAlignment" Value="Center" />
-                <Setter Property="Background" Value="{DynamicResource InputBg}" />
-                <Setter Property="Foreground" Value="{DynamicResource Fg}" />
-                <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
-            </Style>
+
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -56,7 +48,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="相机类型" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                        <ComboBox x:Name="CamTypeBox" Grid.Column="1" Width="150" Style="{StaticResource Cmb}" SelectionChanged="CamTypeBox_SelectionChanged">
+                        <ComboBox x:Name="CamTypeBox" Grid.Column="1" Width="150" SelectionChanged="CamTypeBox_SelectionChanged">
                             <ComboBoxItem Content="USB / 内置相机" />
                             <ComboBoxItem Content="海康 MVS" />
                             <ComboBoxItem Content="大恒 Galaxy" />
@@ -84,19 +76,19 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="索引" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <ComboBox x:Name="CamIndexBox" Grid.Column="1" Width="56" Style="{StaticResource Cmb}" />
+                        <ComboBox x:Name="CamIndexBox" Grid.Column="1" Width="56" />
                         <TextBlock Text="后端" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <ComboBox x:Name="CamBackendBox" Grid.Column="3" Width="92" Style="{StaticResource Cmb}">
+                        <ComboBox x:Name="CamBackendBox" Grid.Column="3" Width="92">
                             <ComboBoxItem Content="DSHOW" />
                             <ComboBoxItem Content="MSMF" />
                             <ComboBoxItem Content="ANY" />
                         </ComboBox>
                         <TextBlock Text="宽" Style="{StaticResource DimText}" Grid.Column="4" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <TextBox x:Name="CamWBox" Grid.Column="5" Width="64" Text="0" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="CamWBox" Grid.Column="5" Width="80" Text="0" VerticalContentAlignment="Center" />
                         <TextBlock Text="高" Style="{StaticResource DimText}" Grid.Column="6" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <TextBox x:Name="CamHBox" Grid.Column="7" Width="64" Text="0" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="CamHBox" Grid.Column="7" Width="80" Text="0" VerticalContentAlignment="Center" />
                         <TextBlock Text="帧率" Style="{StaticResource DimText}" Grid.Column="8" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <TextBox x:Name="CamFpsBox" Grid.Column="9" Width="56" Text="0" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="CamFpsBox" Grid.Column="9" Width="72" Text="0" VerticalContentAlignment="Center" />
                         <TextBlock Text="（0=相机默认）" Style="{StaticResource FaintText}" Grid.Column="10" VerticalAlignment="Center" Margin="8,0,0,0" />
                     </Grid>
 
@@ -123,7 +115,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="协议" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                        <ComboBox x:Name="PlcTypeBox" Grid.Column="1" Width="170" Style="{StaticResource Cmb}" SelectionChanged="PlcTypeBox_SelectionChanged">
+                        <ComboBox x:Name="PlcTypeBox" Grid.Column="1" Width="170" SelectionChanged="PlcTypeBox_SelectionChanged">
                             <ComboBoxItem Content="Modbus TCP（以太网）" />
                             <ComboBoxItem Content="Modbus RTU（串口）" />
                             <ComboBoxItem Content="西门子 S7（TCP）" />
@@ -148,11 +140,11 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="IP" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox x:Name="PlcIpBox" Grid.Column="1" Width="110" Text="192.168.1.1" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="PlcIpBox" Grid.Column="1" Width="130" Text="192.168.1.1" VerticalContentAlignment="Center" />
                         <TextBlock Text="端口" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <TextBox x:Name="PlcPortBox" Grid.Column="3" Width="56" Text="502" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="PlcPortBox" Grid.Column="3" Width="72" Text="502" VerticalContentAlignment="Center" />
                         <TextBlock Text="单元ID" Style="{StaticResource DimText}" Grid.Column="4" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <TextBox x:Name="PlcUnitBox" Grid.Column="5" Width="48" Text="1" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="PlcUnitBox" Grid.Column="5" Width="64" Text="1" VerticalContentAlignment="Center" />
                     </Grid>
 
                     <!-- Modbus RTU 参数行 -->
@@ -172,9 +164,9 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="串口" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox x:Name="PlcComBox" Grid.Column="1" Width="64" Text="COM3" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="PlcComBox" Grid.Column="1" Width="80" Text="COM3" VerticalContentAlignment="Center" />
                         <TextBlock Text="波特率" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <ComboBox x:Name="PlcBaudBox" Grid.Column="3" Width="92" Style="{StaticResource Cmb}">
+                        <ComboBox x:Name="PlcBaudBox" Grid.Column="3" Width="92">
                             <ComboBoxItem Content="9600" />
                             <ComboBoxItem Content="19200" />
                             <ComboBoxItem Content="38400" />
@@ -182,23 +174,23 @@
                             <ComboBoxItem Content="115200" />
                         </ComboBox>
                         <TextBlock Text="数据位" Style="{StaticResource DimText}" Grid.Column="4" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <ComboBox x:Name="PlcDataBox" Grid.Column="5" Width="52" Style="{StaticResource Cmb}">
+                        <ComboBox x:Name="PlcDataBox" Grid.Column="5" Width="52">
                             <ComboBoxItem Content="7" />
                             <ComboBoxItem Content="8" />
                         </ComboBox>
                         <TextBlock Text="校验" Style="{StaticResource DimText}" Grid.Column="6" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <ComboBox x:Name="PlcParityBox" Grid.Column="7" Width="72" Style="{StaticResource Cmb}">
+                        <ComboBox x:Name="PlcParityBox" Grid.Column="7" Width="72">
                             <ComboBoxItem Content="无" />
                             <ComboBoxItem Content="奇校验" />
                             <ComboBoxItem Content="偶校验" />
                         </ComboBox>
                         <TextBlock Text="停止位" Style="{StaticResource DimText}" Grid.Column="8" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <ComboBox x:Name="PlcStopBox" Grid.Column="9" Width="52" Style="{StaticResource Cmb}">
+                        <ComboBox x:Name="PlcStopBox" Grid.Column="9" Width="52">
                             <ComboBoxItem Content="1" />
                             <ComboBoxItem Content="2" />
                         </ComboBox>
                         <TextBlock Text="从站" Style="{StaticResource DimText}" Grid.Column="10" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <TextBox x:Name="PlcSlaveBox" Grid.Column="11" Width="48" Text="1" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="PlcSlaveBox" Grid.Column="11" Width="64" Text="1" VerticalContentAlignment="Center" />
                     </Grid>
 
                     <!-- 西门子 S7 参数行 -->
@@ -214,13 +206,13 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="IP" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox x:Name="S7IpBox" Grid.Column="1" Width="110" Text="192.168.0.1" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="S7IpBox" Grid.Column="1" Width="130" Text="192.168.0.1" VerticalContentAlignment="Center" />
                         <TextBlock Text="端口" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <TextBox x:Name="S7PortBox" Grid.Column="3" Width="56" Text="102" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="S7PortBox" Grid.Column="3" Width="72" Text="102" VerticalContentAlignment="Center" />
                         <TextBlock Text="机架" Style="{StaticResource DimText}" Grid.Column="4" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <TextBox x:Name="S7RackBox" Grid.Column="5" Width="44" Text="0" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="S7RackBox" Grid.Column="5" Width="60" Text="0" VerticalContentAlignment="Center" />
                         <TextBlock Text="槽" Style="{StaticResource DimText}" Grid.Column="6" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <TextBox x:Name="S7SlotBox" Grid.Column="7" Width="44" Text="1" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="S7SlotBox" Grid.Column="7" Width="60" Text="1" VerticalContentAlignment="Center" />
                     </Grid>
 
                     <!-- 三菱 MC 参数行 -->
@@ -232,9 +224,9 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="IP" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox x:Name="McIpBox" Grid.Column="1" Width="120" Text="192.168.3.250" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="McIpBox" Grid.Column="1" Width="140" Text="192.168.3.250" VerticalContentAlignment="Center" />
                         <TextBlock Text="端口" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <TextBox x:Name="McPortBox" Grid.Column="3" Width="56" Text="6000" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="McPortBox" Grid.Column="3" Width="72" Text="6000" VerticalContentAlignment="Center" />
                     </Grid>
 
                     <!-- 读写测试参数行 -->
@@ -247,9 +239,9 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="地址" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox x:Name="PlcAddrBox" Grid.Column="1" Width="130" Text="0" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="PlcAddrBox" Grid.Column="1" Width="160" Text="0" VerticalContentAlignment="Center" />
                         <TextBlock Text="值" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <TextBox x:Name="PlcValBox" Grid.Column="3" Width="80" Text="0" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="PlcValBox" Grid.Column="3" Width="110" Text="0" VerticalContentAlignment="Center" />
                         <TextBlock x:Name="PlcAddrHint" Style="{StaticResource FaintText}" Grid.Column="4" VerticalAlignment="Center" Margin="8,0,0,0"
                                    Text="Modbus: 地址 0~65535；S7: DB1.DBW0 / MW20；MC: D100 / M10" TextWrapping="Wrap" />
                     </Grid>
@@ -270,7 +262,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="类型" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                        <ComboBox x:Name="GenTypeBox" Grid.Column="1" Width="110" Style="{StaticResource Cmb}" SelectionChanged="GenTypeBox_SelectionChanged">
+                        <ComboBox x:Name="GenTypeBox" Grid.Column="1" Width="110" SelectionChanged="GenTypeBox_SelectionChanged">
                             <ComboBoxItem Content="TCP" />
                             <ComboBoxItem Content="UDP" />
                             <ComboBoxItem Content="串口" />
@@ -291,9 +283,9 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="IP" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox x:Name="GenTcpIpBox" Grid.Column="1" Width="110" Text="127.0.0.1" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="GenTcpIpBox" Grid.Column="1" Width="130" Text="127.0.0.1" VerticalContentAlignment="Center" />
                         <TextBlock Text="端口" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <TextBox x:Name="GenTcpPortBox" Grid.Column="3" Width="56" Text="1024" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="GenTcpPortBox" Grid.Column="3" Width="72" Text="1024" VerticalContentAlignment="Center" />
                     </Grid>
 
                     <!-- UDP 参数 -->
@@ -305,9 +297,9 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="IP" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox x:Name="GenUdpIpBox" Grid.Column="1" Width="110" Text="127.0.0.1" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="GenUdpIpBox" Grid.Column="1" Width="130" Text="127.0.0.1" VerticalContentAlignment="Center" />
                         <TextBlock Text="端口" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <TextBox x:Name="GenUdpPortBox" Grid.Column="3" Width="56" Text="5000" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="GenUdpPortBox" Grid.Column="3" Width="72" Text="5000" VerticalContentAlignment="Center" />
                     </Grid>
 
                     <!-- 串口参数 -->
@@ -325,9 +317,9 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="串口" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox x:Name="GenComBox" Grid.Column="1" Width="64" Text="COM3" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="GenComBox" Grid.Column="1" Width="80" Text="COM3" VerticalContentAlignment="Center" />
                         <TextBlock Text="波特率" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <ComboBox x:Name="GenBaudBox" Grid.Column="3" Width="92" Style="{StaticResource Cmb}">
+                        <ComboBox x:Name="GenBaudBox" Grid.Column="3" Width="92">
                             <ComboBoxItem Content="9600" />
                             <ComboBoxItem Content="19200" />
                             <ComboBoxItem Content="38400" />
@@ -335,18 +327,18 @@
                             <ComboBoxItem Content="115200" />
                         </ComboBox>
                         <TextBlock Text="数据位" Style="{StaticResource DimText}" Grid.Column="4" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <ComboBox x:Name="GenDataBox" Grid.Column="5" Width="52" Style="{StaticResource Cmb}">
+                        <ComboBox x:Name="GenDataBox" Grid.Column="5" Width="52">
                             <ComboBoxItem Content="7" />
                             <ComboBoxItem Content="8" />
                         </ComboBox>
                         <TextBlock Text="校验" Style="{StaticResource DimText}" Grid.Column="6" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <ComboBox x:Name="GenParityBox" Grid.Column="7" Width="72" Style="{StaticResource Cmb}">
+                        <ComboBox x:Name="GenParityBox" Grid.Column="7" Width="72">
                             <ComboBoxItem Content="无" />
                             <ComboBoxItem Content="奇校验" />
                             <ComboBoxItem Content="偶校验" />
                         </ComboBox>
                         <TextBlock Text="停止位" Style="{StaticResource DimText}" Grid.Column="8" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <ComboBox x:Name="GenStopBox" Grid.Column="9" Width="52" Style="{StaticResource Cmb}">
+                        <ComboBox x:Name="GenStopBox" Grid.Column="9" Width="52">
                             <ComboBoxItem Content="1" />
                             <ComboBoxItem Content="2" />
                         </ComboBox>
@@ -385,9 +377,9 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="超时（毫秒）" Style="{StaticResource DimText}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                        <TextBox x:Name="TimeoutBox" Grid.Column="1" Width="70" Text="1500" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="TimeoutBox" Grid.Column="1" Width="90" Text="1500" VerticalContentAlignment="Center" />
                         <TextBlock Text="自动重试" Style="{StaticResource DimText}" Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" />
-                        <TextBox x:Name="RetryBox" Grid.Column="3" Width="48" Text="1" VerticalContentAlignment="Center" />
+                        <TextBox x:Name="RetryBox" Grid.Column="3" Width="64" Text="1" VerticalContentAlignment="Center" />
                     </Grid>
                     <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                         <Button x:Name="BtnSaveCfg" Content="保存配置" Style="{StaticResource PrimaryButton}" Click="BtnSaveCfg_Click" />

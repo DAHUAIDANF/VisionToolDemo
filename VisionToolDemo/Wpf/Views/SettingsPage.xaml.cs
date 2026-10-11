@@ -47,7 +47,7 @@ namespace VisionToolDemo.Wpf.Views
                 {
                     Style = (Style)FindResource("Card"),
                     Margin = new Thickness(0, 0, 12, 12),
-                    Width = 152,
+                    Width = 186,
                     Cursor = System.Windows.Input.Cursors.Hand,
                     ToolTip = Ui.Tip("点击应用「" + t.Name + "」主题，立即生效并保存"),
                 };
