@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -21,13 +21,13 @@ namespace VisionToolDemo.Vision
     }
 
     /// <summary>
-    /// 批量处理：对一个文件夹里的每张图跑同一条算子里程，结果图另存并生成报告。
+    /// 批量处理：对一个文件夹里的每张图跑同一条算子链，结果图另存并生成报告。
     ///
     /// 与旧界面一致的行为：
     ///   · 结果图存到「输出目录」，默认 <输入目录>\处理结果；
     ///   · 生成「批量处理报告.txt」（逐文件：结果、耗时、摘要、失败原因）；
     ///   · .raw 裸数据用同一套参数（一批共用），相机 RAW 自动解码。
-    /// 与旧界面的差别：这里跑的是**算子里程文件**，不依赖任何界面状态，因此也能在无人值守下用。
+    /// 与旧界面的差别：这里跑的是**算子链文件**，不依赖任何界面状态，因此也能在无人值守下用。
     /// </summary>
     public static class BatchProcessor
     {
@@ -55,7 +55,7 @@ namespace VisionToolDemo.Vision
             }
             if (chain == null || chain.Count == 0)
             {
-                report = "算子里程是空的：先在视觉页搭好链并导出，或在这里选一个算子里程文件";
+                report = "算子链是空的：先在视觉页搭好链并导出，或在这里选一个算子链文件";
                 return rows;
             }
 
@@ -211,7 +211,7 @@ namespace VisionToolDemo.Vision
             sb.AppendLine("批量处理报告  " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
             sb.AppendLine("输入目录：" + inputDir);
             sb.AppendLine("输出目录：" + outputDir);
-            sb.AppendLine("算子里程：" + string.Join(" → ", chain.Select(s => s.OpName)));
+            sb.AppendLine("算子链：" + string.Join(" → ", chain.Select(s => s.OpName)));
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
                 "共 {0} 个文件：成功 {1}，失败 {2}，总耗时 {3}ms",
                 rows.Count, rows.Count(r => r.Ok), rows.Count(r => !r.Ok), totalMs));

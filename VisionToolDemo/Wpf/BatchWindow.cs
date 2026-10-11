@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -12,9 +12,9 @@ namespace VisionToolDemo.Wpf
 {
     /// <summary>
     /// 批量处理文件夹（WPF 版，等价旧界面的「批量处理文件夹」）：
-    /// 对输入文件夹里的每张图跑同一条**算子里程**，结果图另存并生成报告。
+    /// 对输入文件夹里的每张图跑同一条**算子链**，结果图另存并生成报告。
     ///
-    /// 与旧界面的关键差别：这里跑的是"算子里程"（可存文件），不依赖当前界面状态，
+    /// 与旧界面的关键差别：这里跑的是"算子链"（可存文件），不依赖当前界面状态，
     /// 所以同一条链可以在这里批量跑，也可以在无人值守下用。
     /// </summary>
     public sealed class BatchWindow : Window
@@ -42,7 +42,7 @@ namespace VisionToolDemo.Wpf
 
             _inDir = Ui.Input("");
             _outDir = Ui.Input("");
-            _chainSource = Ui.Combo(new[] { "用视觉页当前的算子里程", "用算子里程文件…" }, 0);
+            _chainSource = Ui.Combo(new[] { "用视觉页当前的算子链", "用算子链文件…" }, 0);
             _chainFile = Ui.Input("");
             _chainFile.IsReadOnly = true;
             _bar = new ProgressBar { Height = 18, Minimum = 0, Maximum = 1, Value = 0, Margin = new Thickness(0, 6, 0, 6) };
@@ -52,11 +52,11 @@ namespace VisionToolDemo.Wpf
 
             var panel = new DockPanel { Margin = new Thickness(14) };
 
-            // 顶部：目录与算子里程
+            // 顶部：目录与算子链
             var top = new StackPanel();
             top.Children.Add(Ui.Row("输入文件夹", MakeBrowseRow(_inDir, BrowseIn)));
             top.Children.Add(Ui.Row("输出文件夹", MakeBrowseRow(_outDir, BrowseOut)));
-            top.Children.Add(Ui.Row("算子里程", _chainSource));
+            top.Children.Add(Ui.Row("算子链", _chainSource));
             top.Children.Add(Ui.Row("里程文件", MakeBrowseRow(_chainFile, BrowseChain, "选择…")));
             top.Children.Add(Ui.Dim("输出留空 = <输入文件夹>\\处理结果；报告写在输入文件夹下的「批量处理报告.txt」。"));
             _chainSource.SelectionChanged += (_, _) => UpdateChainHint();
@@ -107,8 +107,8 @@ namespace VisionToolDemo.Wpf
             bool useFile = _chainSource.SelectedIndex == 1;
             _chainFile.IsEnabled = useFile;
             _status.Text = useFile
-                ? "将使用所选算子里程文件（模板图也在文件里）。"
-                : string.Format("将使用视觉页当前的算子里程（{0} 步）。", _currentChain.Count);
+                ? "将使用所选算子链文件（模板图也在文件里）。"
+                : string.Format("将使用视觉页当前的算子链（{0} 步）。", _currentChain.Count);
         }
 
         private void BrowseIn()
@@ -125,7 +125,7 @@ namespace VisionToolDemo.Wpf
 
         private void BrowseChain()
         {
-            var dlg = new OpenFileDialog { Title = "选择算子里程文件", Filter = "算子里程 (*.chain.json)|*.chain.json|JSON|*.json|所有文件|*.*" };
+            var dlg = new OpenFileDialog { Title = "选择算子链文件", Filter = "算子链 (*.chain.json)|*.chain.json|JSON|*.json|所有文件|*.*" };
             if (dlg.ShowDialog(this) == true)
             {
                 _chainFile.Text = dlg.FileName;
@@ -142,13 +142,13 @@ namespace VisionToolDemo.Wpf
             if (_chainSource.SelectedIndex == 1)
             {
                 string file = _chainFile.Text.Trim();
-                if (file.Length == 0 || !File.Exists(file)) { Ui.Warn("先选算子里程文件"); return; }
+                if (file.Length == 0 || !File.Exists(file)) { Ui.Warn("先选算子链文件"); return; }
                 try { chain = OperatorChain.FromJson(File.ReadAllText(file)); }
                 catch (Exception ex) { Ui.Error(ex.Message); return; }
             }
             else chain = _currentChain;
 
-            if (chain.Count == 0) { Ui.Warn("算子里程是空的：先回视觉页搭好链"); return; }
+            if (chain.Count == 0) { Ui.Warn("算子链是空的：先回视觉页搭好链"); return; }
 
             _list.Items.Clear();
             _bar.Maximum = 1;

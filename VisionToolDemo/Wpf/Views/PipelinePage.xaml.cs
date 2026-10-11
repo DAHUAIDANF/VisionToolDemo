@@ -288,8 +288,8 @@ namespace VisionToolDemo.Wpf.Views
             });
             Btn("批量处理…", () => OpenBatchWindow());
             Btn("运行整条链", () => RunChain_Click(null, null));
-            Btn("导出算子里程…", () => ExportChain());
-            Btn("导入算子里程…", () => ImportChain());
+            Btn("导出算子链…", () => ExportChain());
+            Btn("导入算子链…", () => ImportChain());
             shell.SetToolbar(items);
 
             if (_srcMat == null || _srcMat.Empty())
@@ -2820,9 +2820,9 @@ namespace VisionToolDemo.Wpf.Views
             Selection.Visibility = w > 1 && h > 1 ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        // ================================================================ 算子里程（导出/导入/批量）
+        // ================================================================ 算子链（导出/导入/批量）
 
-        /// <summary>把界面上的链转成可序列化的算子里程（模板转 base64 PNG）</summary>
+        /// <summary>把界面上的链转成可序列化的算子链（模板转 base64 PNG）</summary>
         private List<ChainStepData> BuildChainData()
         {
             var list = new List<ChainStepData>();
@@ -2857,18 +2857,18 @@ namespace VisionToolDemo.Wpf.Views
 
         private void ExportChain()
         {
-            if (_chain.Count == 0) { Warn("算子里程是空的：先加入几个算子"); return; }
+            if (_chain.Count == 0) { Warn("算子链是空的：先加入几个算子"); return; }
             var dlg = new SaveFileDialog
             {
-                Title = "导出算子里程",
-                Filter = "算子里程 (*.chain.json)|*.chain.json|JSON|*.json",
-                FileName = "算子里程.chain.json",
+                Title = "导出算子链",
+                Filter = "算子链 (*.chain.json)|*.chain.json|JSON|*.json",
+                FileName = "算子链.chain.json",
             };
             if (dlg.ShowDialog() != true) return;
             try
             {
                 System.IO.File.WriteAllText(dlg.FileName, OperatorChain.ToJson(BuildChainData()));
-                SetStatus("算子里程已导出：" + dlg.FileName +
+                SetStatus("算子链已导出：" + dlg.FileName +
                           "（可在「批量处理…」里选它，也可交给无人值守跑同名图）");
             }
             catch (Exception ex) { Warn("导出失败：" + ex.Message); }
@@ -2878,20 +2878,20 @@ namespace VisionToolDemo.Wpf.Views
         {
             var dlg = new OpenFileDialog
             {
-                Title = "导入算子里程",
-                Filter = "算子里程 (*.chain.json)|*.chain.json|JSON|*.json|所有文件|*.*",
+                Title = "导入算子链",
+                Filter = "算子链 (*.chain.json)|*.chain.json|JSON|*.json|所有文件|*.*",
             };
             if (dlg.ShowDialog() != true) return;
             try
             {
                 var data = OperatorChain.FromJson(System.IO.File.ReadAllText(dlg.FileName));
                 ApplyChainData(data);
-                SetStatus(string.Format("已导入算子里程：{0} 步（模板随文件一起来）", data.Count));
+                SetStatus(string.Format("已导入算子链：{0} 步（模板随文件一起来）", data.Count));
             }
             catch (Exception ex) { Warn("导入失败：" + ex.Message); }
         }
 
-        /// <summary>批量处理：用当前链（或选一个算子里程文件）跑整个文件夹</summary>
+        /// <summary>批量处理：用当前链（或选一个算子链文件）跑整个文件夹</summary>
         private void OpenBatchWindow()
         {
             var win = new BatchWindow(BuildChainData(), _rawParams) { Owner = Window.GetWindow(this) };

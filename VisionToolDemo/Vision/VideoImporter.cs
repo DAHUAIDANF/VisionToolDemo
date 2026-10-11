@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -7,7 +7,7 @@ using OpenCvSharp;
 namespace VisionToolDemo.Vision
 {
     /// <summary>
-    /// 视频抽帧：把视频按时间点抽成一张张图，交给算子里程/批量处理用。
+    /// 视频抽帧：把视频按时间点抽成一张张图，交给算子链/批量处理用。
     ///
     /// 本工具是**逐帧图像处理平台**，不是播放器：导入视频的意义是"取出若干帧来做检测"，
     /// 所以抽出的帧会落到磁盘（视频同级目录的"<视频名>_视频抽帧"），

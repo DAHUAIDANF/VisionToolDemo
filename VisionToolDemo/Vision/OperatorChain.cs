@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -7,7 +7,7 @@ using OpenCvSharp;
 
 namespace VisionToolDemo.Vision
 {
-    /// <summary>算子里程里的一步（可序列化：算子名 + 参数 + 模板图）</summary>
+    /// <summary>算子链里的一步（可序列化：算子名 + 参数 + 模板图）</summary>
     public sealed class ChainStepData
     {
         public string OpName { get; set; } = "";
@@ -32,7 +32,7 @@ namespace VisionToolDemo.Vision
     }
 
     /// <summary>
-    /// 算子里程：一串"算子 + 参数（+模板）"，以及把它们依次跑完的能力。
+    /// 算子链：一串"算子 + 参数（+模板）"，以及把它们依次跑完的能力。
     ///
     /// 为什么把它从界面里抽出来：视觉页（人工调）和批量处理（跑文件夹）用的是**同一条链**，
     /// 而且链要能存成文件给别人用/给无人值守用。界面只管编辑，执行语义在这里。
@@ -52,7 +52,7 @@ namespace VisionToolDemo.Vision
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException("算子里程文件解析失败：" + ex.Message, ex);
+                throw new InvalidOperationException("算子链文件解析失败：" + ex.Message, ex);
             }
         }
 
@@ -89,7 +89,7 @@ namespace VisionToolDemo.Vision
         {
             results = new List<ChainStepResult>();
             error = null;
-            if (steps == null || steps.Count == 0) { error = "算子里程是空的"; return null; }
+            if (steps == null || steps.Count == 0) { error = "算子链是空的"; return null; }
             if (input == null || input.Empty()) { error = "没有输入图像"; return null; }
 
             Mat current = input;
@@ -126,7 +126,7 @@ namespace VisionToolDemo.Vision
                                 {
                                     row.Ok = false;
                                     row.Summary = "缺少模板图";
-                                    error = string.Format("第 {0} 步（{1}）需要模板图，但算子里程里没有", i + 1, step.OpName);
+                                    error = string.Format("第 {0} 步（{1}）需要模板图，但算子链里没有", i + 1, step.OpName);
                                     tpl?.Dispose();
                                     return last;
                                 }

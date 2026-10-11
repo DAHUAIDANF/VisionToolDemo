@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using OpenCvSharp;
 
 namespace VisionToolDemo.Vision.Tasks
@@ -8,7 +8,7 @@ namespace VisionToolDemo.Vision.Tasks
     ///
     /// 为什么需要它：ROI（视觉页那个"用选区做 ROI"）只作用于**原图**，
     /// 想对链上某一步的结果再裁一块就没辙了。有了这个算子，裁剪就是链上的一步：
-    ///   读图 → 裁剪矩形 → 二值化 → …（位置是显式参数，可存进算子里程，可批量复用）
+    ///   读图 → 裁剪矩形 → 二值化 → …（位置是显式参数，可存进算子链，可批量复用）
     ///
     /// 两种模式：
     ///   · 固定坐标：X/Y/宽/高 直接是像素（宽/高填 0 表示"到右/下边缘"）；

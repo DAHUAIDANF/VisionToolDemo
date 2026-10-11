@@ -428,7 +428,7 @@ namespace VisionToolDemo.Wpf
             row.Children.Add(ok); row.Children.Add(cancel);
             sp.Children.Add(row);
             Content = sp;
-            Background = new SolidColorBrush(Color.FromRgb(0x14, 0x16, 0x1A));
+            Background = Ui.Brush("PanelBg", "#14161A");
         }
     }
 }
