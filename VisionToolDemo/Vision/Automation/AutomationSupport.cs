@@ -66,6 +66,9 @@ namespace VisionToolDemo.Vision.Automation
                 case BlendModeTask t: t.TemplateMat = template; return true;
                 case InpaintTask t: t.TemplateMat = template; return true;
                 case ImageStitchTask t: t.TemplateMat = template; return true;   // 图像拼接的第二幅图
+                case ImageAlignTask t: t.TemplateMat = template; return true;    // 图像配准参考图
+                case HistMatchTask t: t.TemplateMat = template; return true;     // 直方图匹配参考图
+                case MultiScaleMatchTask t: t.TemplateMat = template; return true; // 多尺度模板匹配
                 case DeadLeavesTask t: t.ReferenceMat = template; return true;   // 枯叶噪声参考频谱图（可选）
                 case LscTask t: t.ReferenceMat = template; return true;          // 镜头阴影校正参考图（可选）
                 case WaitConditionTask t: t.TemplateMat = template; return true;

@@ -62,47 +62,60 @@ namespace VisionToolDemo.Vision.Tasks
 
             using (Mat gray = VisionHelper.ToGray(srcMat))
             using (Mat refGray = VisionHelper.ToGray(TemplateMat))
+            using (Mat grayF = new Mat())
+            using (Mat refF = new Mat())
             {
-                // 相位相关（OpenCV 内部做 DFT + 互功率谱 + 逆变换找峰值）
-                Point2d shift = Cv2.PhaseCorrelate(refGray, gray, null, out double response);
+                // phaseCorrelate 要求输入为 CV_32FC1 / CV_64FC1（OpenCV 校验 src1.type()），
+                // 灰度 8U 必须先转 32F，否则抛 "src1.type() == CV_32FC1 ..."。
+                gray.ConvertTo(grayF, MatType.CV_32F);
+                refGray.ConvertTo(refF, MatType.CV_32F);
 
-                double dx = shift.X, dy = shift.Y;
-                Mat dst;
-                if (mode == 0)
+                // 相位相关（OpenCV 内部做 DFT + 互功率谱 + 逆变换找峰值）。
+                // window 参数不能传 null：OpenCvSharp 封装在 window 为 null 时抛
+                // "Value cannot be null. (Parameter 'window')"。传一张与输入同尺寸的
+                // 全 1 浮点窗 = 不做加窗（等价 OpenCV C++ 的 noArray() 默认行为）。
+                using (Mat win = new Mat(grayF.Rows, grayF.Cols, MatType.CV_32F, Scalar.All(1)))
                 {
-                    // 对齐图：把当前图按位移平移回去
-                    using (Mat M = Mat.FromPixelData(2, 3, MatType.CV_32F, new float[] { 1, 0, (float)dx, 0, 1, (float)dy }))
+                    Point2d shift = Cv2.PhaseCorrelate(refF, grayF, win, out double response);
+
+                    double dx = shift.X, dy = shift.Y;
+                    Mat dst;
+                    if (mode == 0)
                     {
-                        dst = new Mat();
-                        Cv2.WarpAffine(srcMat, dst, M, srcMat.Size(), InterpolationFlags.Cubic,
-                            BorderTypes.Replicate);
-                    }
-                }
-                else
-                {
-                    // 位移量可视化：灰度图，像素值 = 距离中心的位移幅度（放大 20 倍显示）
-                    dst = new Mat(gray.Rows, gray.Cols, MatType.CV_8U, Scalar.All(0));
-                    int cx = dst.Cols / 2, cy = dst.Rows / 2;
-                    for (int y = 0; y < dst.Rows; y++)
-                        for (int x = 0; x < dst.Cols; x++)
+                        // 对齐图：把当前图按位移平移回去
+                        using (Mat M = Mat.FromPixelData(2, 3, MatType.CV_32F, new float[] { 1, 0, (float)dx, 0, 1, (float)dy }))
                         {
-                            double v = Math.Sqrt((x - cx - dx * 20) * (x - cx - dx * 20)
-                                               + (y - cy - dy * 20) * (y - cy - dy * 20));
-                            dst.At<byte>(y, x) = (byte)Math.Min(255, v * 2);
+                            dst = new Mat();
+                            Cv2.WarpAffine(srcMat, dst, M, srcMat.Size(), InterpolationFlags.Cubic,
+                                BorderTypes.Replicate);
                         }
-                }
+                    }
+                    else
+                    {
+                        // 位移量可视化：灰度图，像素值 = 距离中心的位移幅度（放大 20 倍显示）
+                        dst = new Mat(gray.Rows, gray.Cols, MatType.CV_8U, Scalar.All(0));
+                        int cx = dst.Cols / 2, cy = dst.Rows / 2;
+                        for (int y = 0; y < dst.Rows; y++)
+                            for (int x = 0; x < dst.Cols; x++)
+                            {
+                                double v = Math.Sqrt((x - cx - dx * 20) * (x - cx - dx * 20)
+                                                   + (y - cy - dy * 20) * (y - cy - dy * 20));
+                                dst.At<byte>(y, x) = (byte)Math.Min(255, v * 2);
+                            }
+                    }
 
-                if (drawArrow && mode == 0 && dst.Channels() == 1)
-                    dst = dst.CvtColor(ColorConversionCodes.GRAY2BGR);
-                if (drawArrow)
-                {
-                    Point c = new(dst.Cols / 2, dst.Rows / 2);
-                    Point e = new((int)(c.X + dx * 5), (int)(c.Y + dy * 5));
-                    Cv2.ArrowedLine(dst, c, e, new Scalar(0, 0, 255), 2, LineTypes.AntiAlias, 0, 0.3);
-                }
+                    if (drawArrow && mode == 0 && dst.Channels() == 1)
+                        dst = dst.CvtColor(ColorConversionCodes.GRAY2BGR);
+                    if (drawArrow)
+                    {
+                        Point c = new(dst.Cols / 2, dst.Rows / 2);
+                        Point e = new((int)(c.X + dx * 5), (int)(c.Y + dy * 5));
+                        Cv2.ArrowedLine(dst, c, e, new Scalar(0, 0, 255), 2, LineTypes.AntiAlias, 0, 0.3);
+                    }
 
-                LastSummary = $"图像配准: 位移 ΔX={dx:F1} ΔY={dy:F1} 像素（参考 vs 当前）";
-                return dst;
+                    LastSummary = $"图像配准: 位移 ΔX={dx:F1} ΔY={dy:F1} 像素（参考 vs 当前）";
+                    return dst;
+                }
             }
         }
     }

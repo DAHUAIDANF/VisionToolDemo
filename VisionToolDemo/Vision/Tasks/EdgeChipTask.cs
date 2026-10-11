@@ -89,6 +89,13 @@ namespace VisionToolDemo.Vision.Tasks
             // 后续形态学/距离变换在这种图上会 native abort —— 直接提示"未找到轮廓"优雅返回
             long fg = Cv2.CountNonZero(bin);
             double fgRatio = fg / (double)(bin.Cols * (long)bin.Rows);
+            // 白底黑目标场景（白背景占比过半）：反相后检测暗目标，
+            // 否则参考轮廓=整幅白底矩形，DistanceTransform 无背景像素会返回 float.MaxValue
+            if (fgRatio > 0.5)
+            {
+                Cv2.BitwiseNot(bin, bin);
+                fgRatio = 1 - fgRatio;
+            }
             if (fgRatio > 0.999 || fgRatio < 0.001)
             {
                 LastSummary = "边缘崩缺毛刺: 二值图几乎全一色（阈值拉到极值），没有可测轮廓";
@@ -121,25 +128,37 @@ namespace VisionToolDemo.Vision.Tasks
             // —— 生成参考（理想）轮廓 ——
             using Mat filled = new(bin.Size(), MatType.CV_8UC1, Scalar.Black);
             Cv2.DrawContours(filled, new[] { best }, -1, Scalar.White, -1);
-            using Mat el = Cv2.GetStructuringElement(MorphShapes.Ellipse, new Size(refK, refK));
-            using Mat closed = new();
-            Cv2.MorphologyEx(filled, closed, MorphTypes.Close, el);
-            // 开运算把残留毛刺也削掉，得到光滑参考
-            Cv2.MorphologyEx(closed, closed, MorphTypes.Open, el);
+            Point[] refC = null;
+            Mat closedKeep = null;
+            int tryK = refK;
+            while (tryK >= 3)
+            {
+                using Mat el = Cv2.GetStructuringElement(MorphShapes.Ellipse, new Size(tryK, tryK));
+                Mat closed = new();
+                Cv2.MorphologyEx(filled, closed, MorphTypes.Close, el);
+                // 开运算把残留毛刺也削掉，得到光滑参考
+                Cv2.MorphologyEx(closed, closed, MorphTypes.Open, el);
 
-            Cv2.FindContours(closed, out Point[][] refCs, out _, RetrievalModes.External,
-                ContourApproximationModes.ApproxNone);
-            if (refCs.Length == 0)
+                Cv2.FindContours(closed, out Point[][] refCs, out _, RetrievalModes.External,
+                    ContourApproximationModes.ApproxNone);
+                if (refCs.Length > 0)
+                {
+                    double refArea = 0;
+                    foreach (Point[] c in refCs)
+                    {
+                        double a = Cv2.ContourArea(c);
+                        if (a > refArea) { refArea = a; refC = c; }
+                    }
+                    if (refC != null) { closedKeep = closed; break; }
+                }
+                // 参考核过大把目标吃掉了：自动减半重试
+                closed.Dispose();
+                tryK = tryK / 2;
+            }
+            if (refC == null || refC.Length < 8)
             {
                 LastSummary = "边缘崩缺毛刺: 参考轮廓生成失败（参考核可能过大，把目标吃掉了）";
                 return dst;
-            }
-            Point[] refC = refCs[0];
-            double refArea = 0;
-            foreach (Point[] c in refCs)
-            {
-                double a = Cv2.ContourArea(c);
-                if (a > refArea) { refArea = a; refC = c; }
             }
 
             // —— 逐点量法向偏差 ——
@@ -149,10 +168,10 @@ namespace VisionToolDemo.Vision.Tasks
             // 距离变换：distOut = 到参考形状的距离（在外侧时 >0），
             // distIn  = 到参考补集的距离（在内侧时 >0）。
             using Mat notRef = new();
-            Cv2.BitwiseNot(closed, notRef);
+            Cv2.BitwiseNot(closedKeep, notRef);
             using Mat distOut = new(), distIn = new();
             Cv2.DistanceTransform(notRef, distOut, DistanceTypes.L2, DistanceTransformMasks.Mask3);
-            Cv2.DistanceTransform(closed, distIn, DistanceTypes.L2, DistanceTransformMasks.Mask3);
+            Cv2.DistanceTransform(closedKeep, distIn, DistanceTypes.L2, DistanceTransformMasks.Mask3);
 
             var deviations = new double[best.Length];
             var inside = new bool[best.Length];
@@ -160,9 +179,11 @@ namespace VisionToolDemo.Vision.Tasks
             {
                 int x = Math.Clamp(best[i].X, 0, bin.Cols - 1);
                 int y = Math.Clamp(best[i].Y, 0, bin.Rows - 1);
-                inside[i] = closed.At<byte>(y, x) > 127;
+                inside[i] = closedKeep.At<byte>(y, x) > 127;
                 deviations[i] = inside[i] ? -distIn.At<float>(y, x) : distOut.At<float>(y, x);
             }
+            closedKeep?.Dispose();
+            closedKeep = null;
 
             // —— 找连续超限段 ——
             double maxDev = 0, maxChip = 0, maxBurr = 0;

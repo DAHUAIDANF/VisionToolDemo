@@ -115,6 +115,15 @@ namespace VisionToolDemo.Vision.Tasks
         public bool SetReferenceFrom(Mat image, string label)
         {
             if (image == null || image.Empty()) { _loadError = "参考图为空"; return false; }
+            // 防御：没选特征模型就设参考时，给友好提示而不是 InferenceSession("") 抛
+            // "The path is empty" 的晦涩异常
+            if (string.IsNullOrWhiteSpace(FeatureModelPath) || !File.Exists(FeatureModelPath))
+            {
+                _loadError = string.IsNullOrWhiteSpace(FeatureModelPath)
+                    ? "请先在参数区选择特征模型(.onnx)"
+                    : "特征模型文件不存在（" + FeatureModelPath + "）";
+                return false;
+            }
             try
             {
                 // 先确保特征模型会话与输入边长就绪（未执行过 Execute 时 _session 可能还没建）

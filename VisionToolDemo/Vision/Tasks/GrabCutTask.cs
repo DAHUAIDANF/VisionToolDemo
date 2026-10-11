@@ -61,20 +61,42 @@ namespace VisionToolDemo.Vision.Tasks
                 : new Rect(bgr.Cols / 10, bgr.Rows / 10, bgr.Cols * 4 / 5, bgr.Rows * 4 / 5);
 
             using (Mat mask = new Mat(bgr.Rows, bgr.Cols, MatType.CV_8UC1, Scalar.All(0)))
-            using (Mat bgd = new Mat(1, 64, MatType.CV_64FC1), fgd = new Mat(1, 64, MatType.CV_64FC1))
+            // OpenCV 要求 GMM 模型为 CV_64FC1、1 行、13*componentsCount 列；
+            // GrabCut 默认 componentsCount=5 → 65 列。写成 1×64 会抛
+            // "_model must have CV_64FC1 type, rows == 1 and cols == 13*componentsCount"。
+            using (Mat bgd = new Mat(1, 65, MatType.CV_64FC1), fgd = new Mat(1, 65, MatType.CV_64FC1))
             {
-                // 第一次：矩形初始化分割
-                Cv2.GrabCut(bgr, mask, rect, bgd, fgd, iter, GrabCutModes.InitWithRect);
-
-                // 排除框：框内像素强制为确定背景，再做一次 Eval 迭代
-                if (ExcludeRect.Width > 2 && ExcludeRect.Height > 2)
+                // 防御：图像前景/背景过于单一（纯色、二值棋盘等）时 GMM 协方差奇异，
+                // OpenCV 抛 "dtrm > std::numeric_limits<double>::epsilon()"。捕获后降级：
+                // 用固定阈值（Otsu）分割替代 GrabCut，保证算子对任何图都能给出结果。
+                try
                 {
-                    Rect ex = ClampRect(ExcludeRect, bgr.Cols, bgr.Rows);
-                    using (Mat exMask = new Mat(ex.Height, ex.Width, MatType.CV_8UC1, Scalar.All(0)))
+                    // 第一次：矩形初始化分割
+                    Cv2.GrabCut(bgr, mask, rect, bgd, fgd, iter, GrabCutModes.InitWithRect);
+
+                    // 排除框：框内像素强制为确定背景，再做一次 Eval 迭代
+                    if (ExcludeRect.Width > 2 && ExcludeRect.Height > 2)
                     {
-                        exMask.CopyTo(mask[ex]);
+                        Rect ex = ClampRect(ExcludeRect, bgr.Cols, bgr.Rows);
+                        using (Mat exMask = new Mat(ex.Height, ex.Width, MatType.CV_8UC1, Scalar.All(0)))
+                        {
+                            exMask.CopyTo(mask[ex]);
+                        }
+                        Cv2.GrabCut(bgr, mask, rect, bgd, fgd, iter, GrabCutModes.Eval);
                     }
-                    Cv2.GrabCut(bgr, mask, rect, bgd, fgd, iter, GrabCutModes.Eval);
+                }
+                catch (OpenCVException)
+                {
+                    // GrabCut 对纯色/低纹理图不稳定：降级为 Otsu 阈值分割 + 矩形外置背景。
+                    // 注意：GrabCut 的 mask 值域是 GC 常量（0/1/2/3），下方 fgMask 生成
+                    // 以 v==1||v==3 判前景；Otsu 输出 0/255，必须先归一化到 0/1。
+                    using (Mat gray = bgr.CvtColor(ColorConversionCodes.BGR2GRAY))
+                    using (Mat th = new Mat())
+                    {
+                        Cv2.Threshold(gray, th, 0, 255, ThresholdTypes.Otsu);
+                        th.ConvertTo(mask, MatType.CV_8UC1, 1.0 / 255.0);
+                    }
+                    LastSummary = "前景抠图: 图过于单一，GrabCut 降级为 Otsu 分割";
                 }
 
                 // 掩膜：可能/确定前景 → 白

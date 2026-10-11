@@ -123,7 +123,17 @@ namespace VisionToolDemo.Wpf
         {
             if (mat.Channels() == 4) return mat;
             var bgra = new Mat();
-            if (mat.Channels() == 3) Cv2.CvtColor(mat, bgra, ColorConversionCodes.BGR2BGRA);
+            if (mat.Type() == MatType.CV_16UC1)
+            {
+                // 16U 深度图：CvtColor 的 GRAY2BGRA 只接受 8UC1，直接转会抛异常。
+                // 先把 16U 线性压到 8U（65535 → 255）再转 BGRA，保证深度图能正常显示。
+                using (Mat g8 = new Mat())
+                {
+                    mat.ConvertTo(g8, MatType.CV_8U, 255.0 / 65535.0);
+                    Cv2.CvtColor(g8, bgra, ColorConversionCodes.GRAY2BGRA);
+                }
+            }
+            else if (mat.Channels() == 3) Cv2.CvtColor(mat, bgra, ColorConversionCodes.BGR2BGRA);
             else if (mat.Channels() == 1) Cv2.CvtColor(mat, bgra, ColorConversionCodes.GRAY2BGRA);
             else
             {

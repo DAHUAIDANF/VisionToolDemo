@@ -151,7 +151,12 @@ namespace VisionToolDemo.Vision.Tasks
             T.Set<double>(0, 2, -minX);
             T.Set<double>(1, 2, -minY);
             using Mat Hfinal = new();
-            Cv2.Gemm(T, homography, 1, null, 0, Hfinal);
+            // Gemm 的 src3 不能传 null：OpenCvSharp 会抛 "Value cannot be null. (Parameter 'src3')"。
+            // 语义 dst = 1*T*H + 0*src3，src3 用同尺寸全 0 矩阵即可。
+            using (Mat zero3 = new Mat(3, 3, MatType.CV_64FC1, Scalar.All(0)))
+            {
+                Cv2.Gemm(T, homography, 1, zero3, 0, Hfinal);
+            }
 
             using Mat canvas = new Mat(ch, cw, a.Type(), Scalar.All(0));
             using Mat maskA = new Mat(ch, cw, MatType.CV_8UC1, Scalar.All(0));
@@ -173,8 +178,11 @@ namespace VisionToolDemo.Vision.Tasks
             // B 经 Hfinal 变换到画布
             using Mat warpB = new();
             Cv2.WarpPerspective(b, warpB, Hfinal, new Size(cw, ch), InterpolationFlags.Linear, BorderTypes.Constant, Scalar.All(0));
-            Cv2.WarpPerspective(Mat.Ones(b.Rows, b.Cols, MatType.CV_8UC1), maskB, Hfinal, new Size(cw, ch),
-                InterpolationFlags.Nearest, BorderTypes.Constant, Scalar.All(0));
+            using (Mat ones8 = new Mat(b.Rows, b.Cols, MatType.CV_8UC1, Scalar.All(1)))
+            {
+                Cv2.WarpPerspective(ones8, maskB, Hfinal, new Size(cw, ch),
+                    InterpolationFlags.Nearest, BorderTypes.Constant, Scalar.All(0));
+            }
 
             // 4) 重叠区线性融合（A 在上层时：alpha = maskB 的渐隐）
             int blendW = blend > 0 ? blend : Math.Max(10, overlap == 0 ? (int)(Math.Min(a.Cols, b.Cols) * 0.2) : overlap);

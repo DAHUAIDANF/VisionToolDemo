@@ -66,17 +66,24 @@ namespace VisionToolDemo.Vision.Tasks
             }
 
             // 分通道乘增益
+            // 注意：Cv2.Split 返回的通道 Mat 与 ch 数组元素是同一对象，
+            // 不能在 Merge 之前提前 Dispose，否则 Merge 访问已释放 Mat 会抛 ObjectDisposedException。
             Mat[] ch;
             Cv2.Split(dst, out ch);
-            using (Mat r = ch[0], g = ch[1], b = ch[2])
-            using (Mat tmp = new())
+            try
             {
-                r.ConvertTo(tmp, -1, rGain, 0); tmp.CopyTo(r);
-                g.ConvertTo(tmp, -1, gGain, 0); tmp.CopyTo(g);
-                b.ConvertTo(tmp, -1, bGain, 0); tmp.CopyTo(b);
+                using (Mat tmp = new())
+                {
+                    ch[0].ConvertTo(tmp, -1, rGain, 0); tmp.CopyTo(ch[0]);
+                    ch[1].ConvertTo(tmp, -1, gGain, 0); tmp.CopyTo(ch[1]);
+                    ch[2].ConvertTo(tmp, -1, bGain, 0); tmp.CopyTo(ch[2]);
+                }
+                Cv2.Merge(ch, dst);
             }
-            Cv2.Merge(ch, dst);
-            foreach (var c in ch) c.Dispose();
+            finally
+            {
+                foreach (var c in ch) c.Dispose();
+            }
 
             LastSummary = $"色彩平衡: R{paramValues[0]}% G{paramValues[1]}% B{paramValues[2]}%";
             return dst;

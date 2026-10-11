@@ -161,11 +161,39 @@ namespace VisionToolDemo.Vision
                     return RawImageLoader.TryLoad(path, rawParams, out mat, out error);
                 }
 
-                mat = Cv2.ImRead(path, ImreadModes.Color);
+                // 用 Unchanged 读取，16 位深度图（灰度 16U）原样保留，供 3D 深度算子
+                // （伪彩/点云/体素/高度）使用；否则默认 ImreadModes.Color 会把 16bit 图
+                // 降成 8U，导致所有 3D 深度算子"输入不是 16U 深度图"直接跳过。
+                mat = Cv2.ImRead(path, ImreadModes.Unchanged);
                 if (mat == null || mat.Empty())
                 {
                     error = "读不出图像（格式不支持或文件损坏）";
                     return false;
+                }
+
+                // 16U 灰度深度图：保留原类型
+                if (mat.Type() == MatType.CV_16UC1)
+                    return true;
+
+                // 其余统一成 8U 3 通道（与原先 ImreadModes.Color 行为一致）
+                if (mat.Channels() == 4)
+                {
+                    Mat bgr = mat.CvtColor(ColorConversionCodes.BGRA2BGR);
+                    mat.Dispose();
+                    mat = bgr;
+                }
+                else if (mat.Type() != MatType.CV_8UC3)
+                {
+                    Mat conv;
+                    if (mat.Channels() == 1)
+                        conv = mat.CvtColor(ColorConversionCodes.GRAY2BGR);
+                    else
+                    {
+                        conv = new Mat();
+                        mat.ConvertTo(conv, MatType.CV_8UC3);
+                    }
+                    mat.Dispose();
+                    mat = conv;
                 }
                 return true;
             }
